@@ -23,7 +23,9 @@ func DetectPluginDirs() []string {
 		filepath.Join(home, ".localgithub", "plugins"),
 	}
 
-	var dirs []string
+	// Non-nil even when nothing exists — callers (and tests) treat this as
+	// a list that may legitimately be empty, not as a lookup failure.
+	dirs := []string{}
 	seen := make(map[string]bool)
 	for _, dir := range candidates {
 		if dir == "" || seen[dir] {
