@@ -27,6 +27,8 @@ jobs:
         run: go test -v -race ./...
 
       - name: Run linter
-        uses: golangci/golangci-lint-action@v6
+        # v7 of the action installs golangci-lint v2.x, which is built with a
+        # Go new enough to analyze this module (v1.64/go1.24 cannot load go 1.25).
+        uses: golangci/golangci-lint-action@v7
         with:
           version: latest
