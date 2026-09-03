@@ -2,28 +2,30 @@
 
 **Local AI Action Execution Engine for LGH (Local Git Hub)**
 
-ActionD 是一个轻量级本地 CI/CD 引擎，专为 AI Agent 设计。它监听 [LGH](https://github.com/JoeGlenn1213/lgh) 的 Git 事件，自动触发插件执行代码检查、测试、构建等任务。
+[English](README.md) | [简体中文](README_CN.md)
 
-## 特性
+ActionD is a lightweight local CI/CD engine designed for AI agents. It listens to Git events from [LGH](https://github.com/JoeGlenn1213/lgh) and automatically triggers plugins to run code checks, tests, builds, and more.
 
-- 🔌 **动态插件发现** - 通过 `manifest.json` 自动发现插件，无需修改代码
-- 🤖 **MCP 集成** - 内置 MCP 服务器，让 AI 助手直接查询和控制 CI/CD
-- 📡 **事件驱动** - 响应 `git.push`、`git.tag` 等 LGH 事件
-- 🖥️ **Web 控制台** - 实时监控面板 `http://localhost:3000`
-- 🔄 **实时流输出** - SSE (Server-Sent Events) 实时日志
-- ⚡ **热加载** - 无需重启即可重载插件
-- 🔄 **端到端工作流** - `dev_cycle_run` 一键完成：提交 → CI → 结果返回
-- ⏮️ **可回滚** - 失败时自动回滚到上一个 commit
+## Features
 
-## 安装
+- 🔌 **Dynamic plugin discovery** — plugins are discovered automatically via `manifest.json`, no code changes required
+- 🤖 **MCP integration** — a built-in MCP server lets AI assistants query and control CI/CD directly
+- 📡 **Event-driven** — reacts to `git.push`, `git.tag`, and other LGH events
+- 🖥️ **Web console** — live monitoring dashboard at `http://localhost:3000`
+- 🔄 **Real-time streaming output** — live logs over SSE (Server-Sent Events)
+- ⚡ **Hot reload** — reload plugins without a restart
+- 🔄 **End-to-end workflow** — `dev_cycle_run` does it all in one call: commit → CI → results
+- ⏮️ **Rollback** — automatically roll back to the previous commit on failure
 
-### 前置要求
+## Installation
+
+### Prerequisites
 
 - Go 1.25+
-- Python 3.8+ (用于插件)
-- [LGH](https://github.com/JoeGlenn1213/lgh) 本地运行
+- Python 3.8+ (used by plugins)
+- [LGH](https://github.com/JoeGlenn1213/lgh) running locally
 
-### 从源码构建
+### Build from source
 
 ```bash
 git clone https://github.com/JoeGlenn1213/ActionD.git
@@ -31,117 +33,119 @@ cd ActionD
 make build
 ```
 
-> 说明：ActionD 使用 SQLite 存储（modernc.org/sqlite 纯 Go 实现），无需 CGO，`make build` 可直接跨平台编译。
+> Note: ActionD uses SQLite for storage (the pure-Go modernc.org/sqlite build) — no CGO is needed and `make build` cross-compiles freely.
 
-## 快速开始
+## Quick Start
 
-### 1. 一键初始化环境 (推荐)
+### 1. One-command setup (recommended)
 
-如果你是第一次使用，我们推荐使用 `setup` 命令自动检查依赖、创建目录结构，并验证环境：
+If this is your first run, use `setup` to check dependencies, create the directory layout, and verify the environment:
 
 ```bash
 actiond setup
 ```
-如果你希望在初始化完成后自动在后台启动，可以使用：
+
+To also start the daemon in the background right after setup:
+
 ```bash
 actiond setup --start
 ```
 
-### 2. 启动服务与检查
+### 2. Start the service and check it
 
 ```bash
-# 1. 确保 LGH 正在运行
+# 1. Make sure LGH is running
 lgh serve -d
 
-# 2. 启动 ActionD（后台模式，默认自动读取 LGH mappings）
+# 2. Start ActionD (daemon mode; reads LGH mappings automatically)
 actiond start -d
 
-# 3. 检查状态
+# 3. Check status
 actiond doctor
 ```
 
-### 3. 打开 Web 控制台
+### 3. Open the web console
 
 ```bash
 open http://localhost:3000
 ```
 
-### 默认目录与自动探测
+### Default directories and auto-detection
 
-- 插件目录会按顺序自动探测：
-  `二进制同目录/plugins` -> `当前目录/plugins` -> `~/.localgithub/plugins`
-- Web 静态资源会按常见位置自动探测，推荐将 `ActionD-Web` 的 `out/` 发布到：
+- Plugin directories are probed in order:
+  `<binary dir>/plugins` → `<working dir>/plugins` → `~/.localgithub/plugins`
+- Web static assets are auto-detected in common locations; the recommended target is publishing `ActionD-Web`'s `out/` to:
   `~/.localgithub/actiond-web/out`
-- 未显式传入 `--repo-root` 时，ActionD 会优先使用 `LGH mappings` 解析仓库，再回退到当前目录语义
+- Without an explicit `--repo-root`, ActionD resolves repositories through LGH mappings first, then falls back to current-directory semantics.
 
-## CLI 命令
+## CLI Commands
 
-| 命令 | 描述 |
+| Command | Description |
 |------|------|
-| `actiond setup` | 一键初始化环境 (v1.2+) |
-| `actiond start` | 前台启动 |
-| `actiond start -d` | 后台守护进程启动 |
-| `actiond stop` | 停止守护进程 |
-| `actiond restart` | 重启服务 (v1.2+) |
-| `actiond status` | 检查运行状态 + 目录信息 (v1.2+) |
-| `actiond plugins restore-go` | 重新启用 Go 校验插件 |
-| `actiond log` | 查看服务器日志 |
-| `actiond doctor` | 诊断系统依赖 (分级检查) |
-| `actiond version` | 打印版本信息 |
-| `actiond mcp` | 启动 MCP 服务器 |
+| `actiond setup` | One-command environment initialization (v1.2+) |
+| `actiond start` | Start in the foreground |
+| `actiond start -d` | Start as a background daemon |
+| `actiond stop` | Stop the daemon |
+| `actiond restart` | Restart the service (v1.2+) |
+| `actiond status` | Show run status + directory info (v1.2+) |
+| `actiond plugins restore-go` | Re-enable the Go verification plugins |
+| `actiond log` | View server logs |
+| `actiond doctor` | Diagnose system dependencies (tiered checks) |
+| `actiond version` | Print version information |
+| `actiond mcp` | Start the MCP server |
 
-### 一键初始化 (v1.2+)
+### One-command setup (v1.2+)
 
-首次安装推荐执行：
+Recommended on first install:
 
 ```bash
 actiond setup
 ```
 
-这会自动完成：
-- 创建目录结构 (`~/.localgithub/*`)
-- 检查依赖 (Git, Python, Go, Node)
-- 检测 Web 资源和插件目录
-- 验证 LGH 连接
+This automatically:
+- Creates the directory layout (`~/.localgithub/*`)
+- Checks dependencies (Git, Python, Go, Node)
+- Detects web assets and plugin directories
+- Verifies the LGH connection
 
-### 诊断系统
+### Doctor
 
 ```bash
 actiond doctor
 ```
 
-会进行 8 大类、分级检查：
-- 📦 系统环境 (Home/Base 目录)
-- 🔧 依赖检查 (Git, Python, Go, Node, golangci-lint)
-- 🔌 服务状态 (LGH, ActionD)
-- 🌐 端口检查 (3000, 8080)
-- 📁 目录检查 (repos, actions, plugins, web, artifacts)
-- 💾 存储检查 (DB 可写性, 配置文件)
-- 🔌 插件检查 (目录, 核心插件状态)
-- 🌐 Web 资源检查
+Runs 8 categories of tiered checks:
+- 📦 System environment (home/base directories)
+- 🔧 Dependencies (Git, Python, Go, Node, golangci-lint)
+- 🔌 Service status (LGH, ActionD)
+- 🌐 Ports (3000, 8080)
+- 📁 Directories (repos, actions, plugins, web, artifacts)
+- 💾 Storage (DB writability, config files)
+- 🔌 Plugins (directories, core plugin status)
+- 🌐 Web assets
 
-检查结果分为三级：
-- **FATAL** - 系统无法工作
-- **WARN** - 部分功能受影响
-- **INFO** - 仅供参考
+Results come in three levels:
+- **FATAL** — the system cannot work
+- **WARN** — some functionality is affected
+- **INFO** — informational only
 
-如果 `doctor` 提示 Go 插件被禁用，可直接恢复：
+If `doctor` reports that the Go plugins are disabled, restore them directly:
 
 ```bash
 actiond plugins restore-go
 ```
 
-### 状态查看 (v1.2+)
+### Status (v1.2+)
 
 ```bash
 actiond status
 ```
 
-显示：
-- 服务运行状态和 PID
-- 所有目录路径及状态
-- LGH 连接状态
-- Web 资源和插件目录
+Shows:
+- Service run status and PID
+- All directory paths and their status
+- LGH connection status
+- Web assets and plugin directories
 
 ## Build Notes
 
@@ -149,31 +153,30 @@ actiond status
 
 `make release` defaults to the current host platform; override `RELEASE_PLATFORMS="linux/amd64 linux/arm64 darwin/arm64"` to build for other targets.
 
-### 启动选项
+### Start options
 
 ```bash
 actiond start --help
 
 Flags:
-  -d, --daemon              后台运行
-      --repo-root string    仓库根目录（可选；未提供时优先使用 LGH mappings）
-      --deepwiki-path       DeepWiki MCP 目录路径（可选）
-      --web-dir string      Web 控制台静态文件目录（可选；默认自动探测）
+  -d, --daemon              run in the background
+      --repo-root string    repository root directory (optional; LGH mappings take priority when omitted)
+      --web-dir string      web console static file directory (optional; auto-detected by default)
 ```
 
-## 动态插件发现 (V1.0.7+)
+## Dynamic Plugin Discovery (V1.0.7+)
 
-ActionD 支持**零代码**添加新插件。只需在插件目录创建 `manifest.json` 文件：
+ActionD supports adding new plugins with **zero code**. Just create a `manifest.json` in a plugin directory:
 
-### 插件目录
+### Plugin directories
 
-ActionD 按以下顺序扫描插件：
+ActionD scans plugins in this order:
 
-1. **系统插件**: `./plugins/` (与二进制文件同目录)
-2. **开发插件**: `./plugins/` (当前工作目录)
-3. **用户插件**: `~/.localgithub/plugins/`
+1. **System plugins**: `./plugins/` (next to the binary)
+2. **Development plugins**: `./plugins/` (current working directory)
+3. **User plugins**: `~/.localgithub/plugins/`
 
-### manifest.json 格式
+### manifest.json format
 
 ```json
 {
@@ -190,54 +193,54 @@ ActionD 按以下顺序扫描插件：
 }
 ```
 
-### 字段说明
+### Field reference
 
-| 字段 | 必填 | 描述 |
+| Field | Required | Description |
 |------|------|------|
-| `name` | ✅ | 插件唯一标识 |
-| `command` | ✅ | 执行命令 |
-| `args` | - | 命令参数 |
-| `triggers` | ✅ | 触发事件: `git.push`, `git.tag` |
-| `languages` | - | 支持的语言: `go`, `java`, `python`, `web`, `node`, `typescript`, `javascript`, `nextjs`, `*` |
-| `timeout` | - | 超时时间: `5m`, `30s` |
-| `refFilter` | - | Ref 匹配: `refs/tags/*` |
+| `name` | ✅ | Unique plugin identifier |
+| `command` | ✅ | Command to execute |
+| `args` | - | Command arguments |
+| `triggers` | ✅ | Trigger events: `git.push`, `git.tag` |
+| `languages` | - | Supported languages: `go`, `java`, `python`, `web`, `node`, `typescript`, `javascript`, `nextjs`, `*` |
+| `timeout` | - | Timeout: `5m`, `30s` |
+| `refFilter` | - | Ref matching: `refs/tags/*` |
 
-### 创建自定义插件
+### Creating a custom plugin
 
 ```
 plugins/
 └── my-plugin/
-    ├── manifest.json    # 插件元数据
-    └── run.py           # 执行脚本
+    ├── manifest.json    # plugin metadata
+    └── run.py           # execution script
 ```
 
-**run.py 示例**:
+**Example run.py**:
 
 ```python
 #!/usr/bin/env python3
 import json
 import sys
 
-# 读取 stdin 输入
+# Read stdin input
 input_data = json.load(sys.stdin)
 event = input_data["event"]
 repo_path = input_data["repo_path"]
 artifact_dir = input_data.get("artifact_dir")
 
-# 执行任务...
+# Do the work...
 print(f"Processing {event['type']} for {repo_path}", file=sys.stderr)
 
-# 输出结果 (stdout)
+# Output the result (stdout)
 result = {
-    "status": "success",  # 或 "error"
+    "status": "success",  # or "error"
     "artifacts": ["report.json"]
 }
 print(json.dumps(result))
 ```
 
-## 结构化结果协议 ActionResult (v1.2+)
+## Structured Result Protocol — ActionResult (v1.2+)
 
-ActionD 支持插件返回标准化的 `ActionResult` 结构，便于 AI 深度理解和后续决策拦截（例如 Policy Gate 插件会直接读取其他插件产生的 signals）：
+Plugins can return a standardized `ActionResult` structure that enables deep AI understanding and downstream decision gating (for example, the Policy Gate plugin reads signals produced by other plugins):
 
 ```json
 {
@@ -266,21 +269,21 @@ ActionD 支持插件返回标准化的 `ActionResult` 结构，便于 AI 深度�
 }
 ```
 
-### 结果字段
+### Result fields
 
-| 字段 | 类型 | 描述 |
+| Field | Type | Description |
 |------|------|------|
-| `action_id` | string | 唯一执行 ID |
+| `action_id` | string | Unique execution ID |
 | `status` | string | `success`, `failed`, `skipped` |
-| `decision` | string | `pass`, `deny` (用于门禁和 AI 决策) |
-| `summary.message` | string | 一句话摘要 |
-| `signals` | object | **核心特征提取**，如 `tests_passed`, `lint_error_count` 等 |
-| `hints` | []string | AI/用户友好的修复建议 |
-| `artifacts` | []object | 产物文件列表 |
+| `decision` | string | `pass`, `deny` (used for gating and AI decisions) |
+| `summary.message` | string | One-line summary |
+| `signals` | object | **Core extracted features**, e.g. `tests_passed`, `lint_error_count` |
+| `hints` | []string | AI/user-friendly fix suggestions |
+| `artifacts` | []object | Artifact file list |
 
-### 插件输出结构化结果
+### Returning structured results from a plugin
 
-插件可以在 stdout 输出 JSON，ActionD 会自动解析并存储：
+A plugin can print JSON to stdout — ActionD parses and stores it automatically:
 
 ```python
 result = {
@@ -291,126 +294,125 @@ result = {
 print(json.dumps(result))
 ```
 
-或者写入 `$ARTIFACT_DIR/result.json` 文件。
+Alternatively, write to `$ARTIFACT_DIR/result.json`.
 
-## 失败解释器 (v1.2+)
+## Failure Interpreter (v1.2+)
 
-ActionD 内置失败模式识别，自动分析常见错误并提供修复建议：
+ActionD has built-in failure-pattern recognition that automatically analyzes common errors and suggests fixes:
 
-### 支持的错误模式
+### Recognized error patterns
 
-| 类别 | 模式 | 描述 |
+| Category | Pattern | Description |
 |------|------|------|
-| **依赖** | `npm_install_failed` | npm 安装失败 |
-| | `npm_lockfile_mismatch` | package-lock.json 不同步 |
-| | `npm_module_not_found` | 模块未找到 |
-| | `go_mod_tidy` | go.mod 需要整理 |
-| | `python_module_not_found` | Python 模块缺失 |
-| | `maven_build_failed` | Maven 构建失败 |
-| **构建** | `go_build_failed` | Go 编译错误 |
-| | `gradle_build_failed` | Gradle 构建失败 |
-| **测试** | `jest_test_failed` | Jest 测试失败 |
-| | `go_test_failed` | Go 测试失败 |
-| | `pytest_failed` | pytest 失败 |
-| **通用** | `permission_denied` | 权限错误 |
-| | `timeout` | 操作超时 |
-| | `out_of_memory` | 内存不足 |
-| | `command_not_found` | 命令未找到 |
+| **Dependencies** | `npm_install_failed` | npm install failure |
+| | `npm_lockfile_mismatch` | package-lock.json out of sync |
+| | `npm_module_not_found` | module not found |
+| | `go_mod_tidy` | go.mod needs tidying |
+| | `python_module_not_found` | missing Python module |
+| | `maven_build_failed` | Maven build failure |
+| **Build** | `go_build_failed` | Go compile error |
+| | `gradle_build_failed` | Gradle build failure |
+| **Tests** | `jest_test_failed` | Jest test failure |
+| | `go_test_failed` | Go test failure |
+| | `pytest_failed` | pytest failure |
+| **Generic** | `permission_denied` | permission error |
+| | `timeout` | operation timed out |
+| | `out_of_memory` | out of memory |
+| | `command_not_found` | command not found |
 
-### 分析 API
+### Analysis API
 
-失败分析由 Go 端 `internal/interpreter`（`failure.go`）实现，产出上表所列的 `category`/`type` 分类。**仓库内不存在 `actiond` Python 包**——调用方请使用以下真实方式之一：
+Failure analysis is implemented on the Go side in `internal/interpreter` (`failure.go`) and produces the `category`/`type` classification shown above. **There is no `actiond` Python package** — use one of these real interfaces instead:
 
-- **AI 侧（推荐）**：MCP 工具 `actiond_diagnose(job_id=...)`，返回根因与修复建议。
-- **HTTP 侧**：REST API（见下文「API 端点」小节）。
+- **AI side (recommended)**: the MCP tool `actiond_diagnose(job_id=...)`, which returns root cause and fix suggestions.
+- **HTTP side**: the REST API (see the "API endpoints" section below).
 
-### 热加载插件
+### Hot-reloading plugins
 
 ```bash
-# 方式 1: API
+# Option 1: API
 curl -X POST http://localhost:3000/api/plugins/reload
 
-# 方式 2: MCP
-# AI 助手可以调用 actiond_plugins_reload 工具
+# Option 2: MCP
+# An AI assistant can call the actiond_plugins_reload tool
 ```
 
-## 内置插件
+## Built-in Plugins
 
-| 插件 | 触发器 | 语言 | 描述 |
+| Plugin | Trigger | Language | Description |
 |------|--------|------|------|
-| `echo` | 全部 | * | 调试插件，回显事件信息 |
-| `go-lint` | `git.push` | Go | golangci-lint 代码检查 |
-| `go-test-fast` | `git.push` | Go | 快速单元测试 |
-| `go-build` | `git.tag` | Go | 跨平台构建 |
-| `java-quicktest` | `git.push` | Java | 智能测试选择 |
-| `java-checkstyle` | `git.push` | Java | Checkstyle 代码风格 |
+| `echo` | all | * | Debug plugin, echoes event info |
+| `go-lint` | `git.push` | Go | golangci-lint code checks |
+| `go-test-fast` | `git.push` | Go | Fast unit tests |
+| `go-build` | `git.tag` | Go | Cross-platform builds |
+| `java-quicktest` | `git.push` | Java | Smart test selection |
+| `java-checkstyle` | `git.push` | Java | Checkstyle code style |
 | `python-pytest` | `git.push` | Python | pytest + coverage |
-| `web-lint` | `git.push` | Web/Node | 前端 lint 检查 |
-| `web-test` | `git.push` | Web/Node | 前端 test 脚本 |
-| `web-build` | `git.push` | Web/Node | 前端 build 校验 |
-| `deepwiki` | `git.tag` | * | AI 文档生成 |
+| `web-lint` | `git.push` | Web/Node | Frontend lint checks |
+| `web-test` | `git.push` | Web/Node | Frontend test script |
+| `web-build` | `git.push` | Web/Node | Frontend build validation |
 
-## MCP 服务器集成
+## MCP Server Integration
 
-ActionD 内置 MCP (Model Context Protocol) 服务器，让 AI 助手（如 Claude）可以直接查询和控制 CI/CD。
+ActionD ships with an MCP (Model Context Protocol) server so AI assistants (such as Claude) can query and control CI/CD directly.
 
-### 启动 MCP 服务器
+### Starting the MCP server
 
 ```bash
 actiond mcp
 ```
 
-如果你希望 AI 通过 MCP 控制 ActionD 启停（`start/stop/restart`），启动前设置：
+To let the AI start/stop/restart ActionD itself over MCP, set this before launching:
 
 ```bash
 ACTIOND_MCP_ALLOW_LIFECYCLE=1 actiond mcp
 ```
 
-### 可用工具
+### Available tools
 
-| 工具 | 描述 |
+| Tool | Description |
 |------|------|
-| `actiond_status` | 获取服务器状态和统计 |
-| `actiond_plugins_list` | 列出所有插件及配置 |
-| `actiond_actions_list` | 列出最近执行的 CI/CD 任务 |
-| `actiond_action_get` | 获取单个任务详情 |
-| `actiond_plugins_reload` | 热加载插件 |
-| `actiond_plugins_recommend` | 按项目特征智能推荐插件（语言/框架检测 + 置信度） |
-| `actiond_plugin_enable` | 为当前项目启用插件 |
-| `actiond_plugin_disable` | 为当前项目禁用插件 |
-| `actiond_log` | 查看服务器运行日志，支持按 job_id 和 plugin_name 过滤 |
-| `actiond_profile_get` | 获取当前执行 profile（fast/full/release） |
-| `actiond_profile_set` | 设置执行 profile，控制每次 push 触发哪些插件 |
-| `actiond_server_start` | 启动 ActionD 服务（需开启生命周期开关） |
-| `actiond_server_stop` | 停止 ActionD 服务（默认保护运行中任务） |
-| `actiond_server_restart` | 重启 ActionD 服务（默认保护运行中任务） |
-| `actiond_job_wait` | 阻塞等待指定任务完成并返回结果，支持 timeout 参数 |
-| `actiond_job_cancel` | 取消任务（校验状态，终态任务会被拒绝） |
-| `actiond_cancel` | 取消任务（Deprecated：优先用 `actiond_job_cancel`） |
-| `actiond_job_retry` | 重试失败的任务 |
-| `actiond_diagnose` | **AI 失败诊断**：根因分析 + 分类 + 修复建议（CI 失败时的首选工具） |
-| `dev_cycle_run` | **端到端开发循环**：提交 → CI → 结果（V1.0.8+） |
+| `actiond_status` | Get server status and statistics |
+| `actiond_plugins_list` | List all plugins and their configuration |
+| `actiond_actions_list` | List recent CI/CD jobs |
+| `actiond_action_get` | Get details of a single job |
+| `actiond_plugins_reload` | Hot-reload plugins |
+| `actiond_plugins_recommend` | Recommend plugins by project profile (language/framework detection + confidence) |
+| `actiond_plugin_enable` | Enable a plugin for the current project |
+| `actiond_plugin_disable` | Disable a plugin for the current project |
+| `actiond_log` | View server logs, filterable by job_id and plugin_name |
+| `actiond_profile_get` | Get the current execution profile (fast/full/release) |
+| `actiond_profile_set` | Set the execution profile, controlling which plugins each push triggers |
+| `actiond_server_start` | Start the ActionD service (requires the lifecycle switch) |
+| `actiond_server_stop` | Stop the ActionD service (protects running jobs by default) |
+| `actiond_server_restart` | Restart the ActionD service (protects running jobs by default) |
+| `actiond_job_wait` | Block until a job finishes and return its result; supports a timeout parameter |
+| `actiond_job_cancel` | Cancel a job (validates state; terminal jobs are rejected) |
+| `actiond_cancel` | Cancel a job (deprecated: prefer `actiond_job_cancel`) |
+| `actiond_job_retry` | Retry a failed job |
+| `actiond_diagnose` | **AI failure diagnosis**: root-cause analysis + classification + fix suggestions (the first tool to reach for when CI fails) |
+| `dev_cycle_run` | **End-to-end dev loop**: commit → CI → results (V1.0.8+) |
 
-> 审批卡住的任务用 CLI `actiond approve <job_id>` 或 REST `POST /api/actions/{id}/approve`（无 MCP 工具）。
+> To approve a blocked job, use the CLI `actiond approve <job_id>` or REST `POST /api/actions/{id}/approve` (there is no MCP tool for this).
 
-### dev_cycle_run 端到端工作流 (V1.0.8+)
+### The dev_cycle_run end-to-end workflow (V1.0.8+)
 
-`dev_cycle_run` 是一个聚合工具，单个 MCP 调用完成完整开发循环：
+`dev_cycle_run` is an aggregate tool that completes the full development loop in a single MCP call:
 
 ```
-改代码 → lgh up → 等待 CI → 返回结构化结果
+edit code → lgh up → wait for CI → return structured results
 ```
 
-**参数：**
+**Parameters:**
 
-| 参数 | 必填 | 描述 |
+| Parameter | Required | Description |
 |------|------|------|
-| `message` | ✅ | Git 提交信息 |
-| `path` | - | 仓库路径（默认当前目录） |
-| `timeout` | - | 等待超时秒数（默认 300 = 5分钟） |
-| `auto_rollback` | - | 失败时自动回滚（默认 false） |
+| `message` | ✅ | Git commit message |
+| `path` | - | Repository path (defaults to the current directory) |
+| `timeout` | - | Wait timeout in seconds (default 300 = 5 minutes) |
+| `auto_rollback` | - | Auto-rollback on failure (default false) |
 
-**返回：**
+**Returns:**
 
 ```json
 {
@@ -419,32 +421,32 @@ ACTIOND_MCP_ALLOW_LIFECYCLE=1 actiond mcp
   "jobs": [
     {"id": "job-1", "plugin": "go-test-fast", "status": "done", "duration": "2.3s"}
   ],
-  "summary": "✅ 全部通过 (2 个插件)"
+  "summary": "✅ All passed (2 plugins)"
 }
 ```
 
-**使用场景：**
+**Typical usage:**
 
 ```
-用户: AI，帮我修改代码并测试
+User: AI, please fix the code and test it
 
-AI: [修改代码...]
-    [调用 dev_cycle_run(message="fix: 修复XX问题")]
+AI:  [edits the code...]
+     [calls dev_cycle_run(message="fix: address the failing case")]
 
-结果: ✅ 全部通过 (2 个插件)
-      - go-lint: ✅ 0.5s
-      - go-test-fast: ✅ 2.3s
+Result: ✅ All passed (2 plugins)
+        - go-lint: ✅ 0.5s
+        - go-test-fast: ✅ 2.3s
 ```
 
-### 可用资源
+### Available resources
 
-- `actiond://status` - 服务器状态
-- `actiond://plugins` - 插件列表
-- `actiond://actions` - 执行记录
+- `actiond://status` — server status
+- `actiond://plugins` — plugin list
+- `actiond://actions` — execution records
 
-### 配置 Claude Code
+### Configuring Claude Code
 
-在 `~/.claude/claude_desktop_config.json` 添加：
+Add to `~/.claude/claude_desktop_config.json`:
 
 ```json
 {
@@ -460,23 +462,23 @@ AI: [修改代码...]
 }
 ```
 
-### AI 使用示例
+### AI usage example
 
 ```
-用户: 检查最近的 CI 任务状态
+User: Check the recent CI jobs
 
-AI: [调用 actiond_actions_list]
-最近有 3 个任务:
-- test-python (python-pytest): ✅ 成功 (1.3s)
-- ActionD (go-lint): ⛔ 已禁用
-- demo-app (java-quicktest): ✅ 成功 (45s)
+AI:  [calls actiond_actions_list]
+     There are 3 recent jobs:
+     - test-python (python-pytest): ✅ success (1.3s)
+     - ActionD (go-lint): ⛔ disabled
+     - demo-app (java-quicktest): ✅ success (45s)
 ```
 
-## 配置
+## Configuration
 
-运行时配置文件: `~/.localgithub/actions/config.json`
+Runtime config file: `~/.localgithub/actions/config.json`
 
-### 禁用插件
+### Disabling a plugin
 
 ```json
 {
@@ -488,13 +490,13 @@ AI: [调用 actiond_actions_list]
 }
 ```
 
-也可以通过 CLI 直接恢复核心 Go 校验链：
+The core Go verification chain can also be restored directly via CLI:
 
 ```bash
 actiond plugins restore-go
 ```
 
-### 覆盖触发器
+### Overriding triggers
 
 ```json
 {
@@ -506,7 +508,7 @@ actiond plugins restore-go
 }
 ```
 
-### 添加自定义插件（无需 manifest.json）
+### Adding a custom plugin (no manifest.json needed)
 
 ```json
 {
@@ -522,7 +524,7 @@ actiond plugins restore-go
 }
 ```
 
-## 架构
+## Architecture
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
@@ -534,39 +536,39 @@ actiond plugins restore-go
           ▼                ▼                ▼
    ┌─────────────┐  ┌─────────────┐  ┌─────────────┐
    │ Web Console │  │  MCP Server │  │    API      │
-   │ (Dashboard) │  │  (AI 集成)  │  │  (RESTful)  │
+   │ (Dashboard) │  │(AI-integration)│ │  (RESTful) │
    └─────────────┘  └─────────────┘  └─────────────┘
 ```
 
-## API 端点
+## API Endpoints
 
-| 端点 | 方法 | 描述 |
+| Endpoint | Method | Description |
 |------|------|------|
-| `/api/plugins` | GET | 列出所有插件 |
-| `/api/plugins` | POST | 创建自定义插件 |
-| `/api/plugins/reload` | POST | 热加载插件 |
-| `/api/plugins/{name}/toggle` | POST | 启用/禁用插件 |
-| `/api/actions` | GET | 列出执行记录 |
-| `/api/actions/{id}` | GET | 获取任务详情 |
-| `/api/actions/{id}/stream` | GET | SSE 实时日志流 |
-| `/api/actions/{id}/artifacts/{file}` | GET | 下载产物 |
-| `/api/actions/{id}/cancel` | POST | 取消运行中的任务 (V1.0.8+) |
-| `/api/actions/{id}/retry` | POST | 重试失败的任务 (V1.0.8+) |
-| `/api/actions/{id}/approve` | POST | 人工审批并放行被阻塞的任务 |
+| `/api/plugins` | GET | List all plugins |
+| `/api/plugins` | POST | Create a custom plugin |
+| `/api/plugins/reload` | POST | Hot-reload plugins |
+| `/api/plugins/{name}/toggle` | POST | Enable/disable a plugin |
+| `/api/actions` | GET | List execution records |
+| `/api/actions/{id}` | GET | Get job details |
+| `/api/actions/{id}/stream` | GET | SSE live log stream |
+| `/api/actions/{id}/artifacts/{file}` | GET | Download an artifact |
+| `/api/actions/{id}/cancel` | POST | Cancel a running job (V1.0.8+) |
+| `/api/actions/{id}/retry` | POST | Retry a failed job (V1.0.8+) |
+| `/api/actions/{id}/approve` | POST | Manually approve a blocked job |
 
-## 日志分层 (v1.2+)
+## Layered Logging (v1.2+)
 
-ActionD 采用分层日志架构，针对不同受众输出不同格式：
+ActionD uses a layered logging architecture that targets different audiences with different formats:
 
-| 层级 | 用途 | 示例 |
+| Layer | Purpose | Example |
 |------|------|------|
-| `event` | 事件日志 | `📨 Received: git.push [my-repo]` |
-| `dispatch` | 调度日志 | `→ Dispatching to: go-lint` |
-| `plugin` | 插件执行 | 插件 stdout/stderr 输出 |
-| `user` | 用户摘要 | `✅ All 3 plugins passed (5.2s)` |
-| `ai` | AI 结构化摘要 | JSON 格式，供 AI 消费 |
+| `event` | Event log | `📨 Received: git.push [my-repo]` |
+| `dispatch` | Dispatch log | `→ Dispatching to: go-lint` |
+| `plugin` | Plugin execution | plugin stdout/stderr output |
+| `user` | User summary | `✅ All 3 plugins passed (5.2s)` |
+| `ai` | AI structured summary | JSON, consumed by AI |
 
-### AI 摘要格式
+### AI summary format
 
 ```json
 {
@@ -586,35 +588,35 @@ ActionD 采用分层日志架构，针对不同受众输出不同格式：
 }
 ```
 
-## 文件位置
+## File Locations
 
-| 路径 | 描述 |
+| Path | Description |
 |------|------|
-| `~/.localgithub/actions/` | 数据目录 |
-| `~/.localgithub/actions/actiond.db` | SQLite 任务数据库 |
-| `~/.localgithub/actions/actiond.pid` | 守护进程 PID 文件 |
-| `~/.localgithub/actions/config.json` | 用户配置 |
-| `~/.localgithub/plugins/` | 用户自定义插件目录 |
-| `~/.localgithub/actions/actiond.log` | 守护进程日志 |
+| `~/.localgithub/actions/` | Data directory |
+| `~/.localgithub/actions/actiond.db` | SQLite job database |
+| `~/.localgithub/actions/actiond.pid` | Daemon PID file |
+| `~/.localgithub/actions/config.json` | User configuration |
+| `~/.localgithub/plugins/` | User-defined plugin directory |
+| `~/.localgithub/actions/actiond.log` | Daemon log |
 
-## 开发
+## Development
 
 ```bash
-# 编译
+# Build
 go build ./...
 
-# 运行测试
+# Run tests
 go test ./...
 
-# 安装到 GOPATH
+# Install to GOPATH
 go install ./cmd/actiond
 ```
 
-## 许可证
+## License
 
-MIT License - 详见 [LICENSE](LICENSE)
+MIT License — see [LICENSE](LICENSE)
 
-## 相关项目
+## Related Projects
 
-- [LGH](https://github.com/JoeGlenn1213/lgh) - Local Git Hub
-- [actiond-web](https://github.com/JoeGlenn1213/actiond-web) - Web 控制台 UI
+- [LGH](https://github.com/JoeGlenn1213/lgh) — Local Git Hub
+- [actiond-web](https://github.com/JoeGlenn1213/actiond-web) — Web console UI
