@@ -1,0 +1,27 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "java-junit-report",
+  "name": "java-junit-report",
+  "version": "1.0.0",
+  "description": "Parse surefire/failsafe XML reports and block CI when tests fail",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["java"],
+  "timeout": "5m",
+  "artifacts": ["junit-report.json", "junit-report.html"],
+  "capability": "test",
+  "owner_layer": "optional",
+  "maturity": "experimental",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "junit-report.json": "Aggregated JUnit/surefire test results",
+    "junit-report.html": "Human-readable test report"
+  }
+}

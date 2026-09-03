@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "web-lint",
+  "name": "web-lint",
+  "version": "1.0.0",
+  "description": "Run the repository lint script (ESLint) for Node/Web projects",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["web", "node", "javascript", "typescript", "nextjs"],
+  "timeout": "5m",
+  "artifacts": ["lint-report.txt"],
+  "capability": "lint",
+  "owner_layer": "optional",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "lint-report.txt": "Lint results and full command output"
+  }
+}

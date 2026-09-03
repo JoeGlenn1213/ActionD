@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "go-build",
+  "name": "go-build",
+  "version": "1.0.0",
+  "description": "Build Go binaries for the current host platform",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.tag"],
+  "languages": ["go"],
+  "timeout": "10m",
+  "artifacts": ["build/"],
+  "capability": "build",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "build/": "Directory of compiled binaries"
+  }
+}

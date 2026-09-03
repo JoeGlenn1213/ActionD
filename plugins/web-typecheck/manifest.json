@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "web-typecheck",
+  "name": "web-typecheck",
+  "version": "1.0.0",
+  "description": "Run TypeScript type checking gate (tsc --noEmit) for TypeScript/Next.js projects",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["typescript", "nextjs"],
+  "timeout": "5m",
+  "artifacts": ["tsc-report.txt"],
+  "capability": "typecheck",
+  "owner_layer": "optional",
+  "maturity": "experimental",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "tsc-report.txt": "TypeScript type checking report"
+  }
+}

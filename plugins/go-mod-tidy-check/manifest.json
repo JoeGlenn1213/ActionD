@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "go-mod-tidy-check",
+  "name": "go-mod-tidy-check",
+  "version": "1.0.0",
+  "description": "Check Go module tidiness (go mod tidy -diff) and block dependency drift",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["go"],
+  "timeout": "5m",
+  "artifacts": ["mod-tidy.diff"],
+  "capability": "deps",
+  "owner_layer": "optional",
+  "maturity": "experimental",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "mod-tidy.diff": "go mod tidy diff output (only written when drift exists)"
+  }
+}

@@ -1,0 +1,35 @@
+name: release
+description: 版本发布流水线，适用于 git.tag 或正式版本产出
+
+stages:
+  - name: setup
+    steps:
+      - plugin: env-check
+
+  - name: build-and-test
+    steps:
+      - plugin: go-build
+      - plugin: integration-test
+
+  - name: security
+    steps:
+      - plugin: security-scan
+
+  - name: artifact-generation
+    steps:
+      - plugin: artifact_manifest
+      - plugin: container-package
+      - plugin: release-note
+
+  - name: governance
+    steps:
+      - plugin: approval-gate
+
+  - name: deployment
+    steps:
+      - plugin: deploy
+
+  - name: observability
+    always_run: true
+    steps:
+      - plugin: observability-export

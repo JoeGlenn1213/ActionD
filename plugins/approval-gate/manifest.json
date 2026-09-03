@@ -1,0 +1,27 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "approval-gate",
+  "name": "approval-gate",
+  "version": "1.0.0",
+  "description": "Human approval gate for critical deployments",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.tag"],
+  "languages": ["*"],
+  "timeout": "24h",
+  "artifacts": ["approval-request.json", "approval-status.json"],
+  "capability": "governance",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["release"],
+  "inputs": {
+    "repo": "string",
+    "tag": "string",
+    "artifacts": "string[]"
+  },
+  "outputs": {
+    "approval-request.json": "Approval request details",
+    "approval-status.json": "Approval decision (approved/rejected)"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "policy-gate",
+  "name": "policy_gate",
+  "version": "1.0.0",
+  "description": "Enforce policy rules for merge/release/deploy decisions",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["*"],
+  "timeout": "30s",
+  "artifacts": ["policy-decision.json"],
+  "capability": "governance",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string",
+    "ruleset": "string"
+  },
+  "outputs": {
+    "policy-decision.json": "JSON decision with passed/failed rules"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "integration-test",
+  "name": "integration-test",
+  "version": "1.0.0",
+  "description": "Run integration tests for the project",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push", "git.tag"],
+  "languages": ["*"],
+  "timeout": "10m",
+  "artifacts": ["integration-report.json"],
+  "capability": "test",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "integration-report.json": "JSON test results"
+  }
+}

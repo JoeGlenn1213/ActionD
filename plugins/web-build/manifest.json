@@ -1,0 +1,29 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "web-build",
+  "name": "web-build",
+  "version": "1.0.0",
+  "description": "Build web applications (Next.js / Vite / Create React App)",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push", "git.tag"],
+  "languages": ["typescript", "javascript"],
+  "timeout": "10m",
+  "artifacts": ["dist/", ".next/", "out/", "build/"],
+  "capability": "build",
+  "owner_layer": "optional",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "dist/": "Vite production build output",
+    ".next/": "Next.js production build output",
+    "out/": "Next.js static export output",
+    "build/": "Create React App production build output"
+  }
+}

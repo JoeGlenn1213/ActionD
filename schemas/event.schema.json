@@ -1,0 +1,74 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Actiond Event Schema",
+  "description": "Standard event context passed to actiond pipelines and plugins.",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "Unique identifier for the event."
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "git.push",
+        "git.tag",
+        "pull_request.opened",
+        "pull_request.updated",
+        "manual.run",
+        "schedule.nightly",
+        "approval.resume"
+      ]
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "actor": {
+      "type": "string"
+    },
+    "repository": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "owner": { "type": "string" },
+        "url": { "type": "string", "format": "uri" }
+      },
+      "required": ["name"]
+    },
+    "git_ref": {
+      "type": "object",
+      "properties": {
+        "branch": { "type": ["string", "null"] },
+        "tag": { "type": ["string", "null"] },
+        "commit_sha": { "type": ["string", "null"] }
+      },
+      "required": ["commit_sha"]
+    },
+    "workspace_context": {
+      "type": "object",
+      "properties": {
+        "target_languages": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "target_modules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "changed_files": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "execution_intent": {
+      "type": "object",
+      "properties": {
+        "profile": { "type": "string" },
+        "trigger_source": { "type": "string" }
+      }
+    }
+  },
+  "required": ["event_id", "event_type", "timestamp", "repository", "git_ref"]
+}

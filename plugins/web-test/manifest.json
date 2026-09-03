@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "web-test",
+  "name": "web-test",
+  "version": "1.0.0",
+  "description": "Run the repository test script (Jest / Vitest) for Node/Web projects",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["web", "node", "javascript", "typescript", "nextjs"],
+  "timeout": "10m",
+  "artifacts": ["test-report.txt"],
+  "capability": "test",
+  "owner_layer": "optional",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "test-report.txt": "Test results and full command output"
+  }
+}

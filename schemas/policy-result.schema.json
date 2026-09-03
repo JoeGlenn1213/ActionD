@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PolicyResult Schema",
+  "description": "Standard output format for the policy-gate plugin.",
+  "type": "object",
+  "properties": {
+    "policy_name": { "type": "string" },
+    "decision": {
+      "type": "string",
+      "enum": ["pass", "needs-review", "deny"]
+    },
+    "reasons": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Explanations for the decision."
+    },
+    "blocked_by": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "rule_id": { "type": "string" },
+          "description": { "type": "string" }
+        }
+      },
+      "description": "Specific rules that caused a deny."
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": ["policy_name", "decision"]
+}

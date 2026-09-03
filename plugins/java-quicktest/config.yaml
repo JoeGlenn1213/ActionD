@@ -1,0 +1,17 @@
+# java-quicktest ActionD Plugin
+# Intelligent test selection for Java/Maven projects
+
+name: java-quicktest
+command: python3
+args:
+  - plugins/java-quicktest/run.py
+triggers:
+  - git.push
+  - git.commit
+timeout: 10m  # Include analysis + test execution
+working_dir: ""  # Use repo_path from event
+
+# Only trigger for Java projects (pom.xml exists)
+match_files:
+  - "*.java"
+  - "pom.xml"

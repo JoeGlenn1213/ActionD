@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "observability-export",
+  "name": "observability-export",
+  "version": "1.0.0",
+  "description": "Export pipeline metrics and logs to observability platforms",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push", "git.tag"],
+  "languages": ["*"],
+  "timeout": "2m",
+  "artifacts": ["observability-export.json"],
+  "capability": "observability",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["full", "release"],
+  "inputs": {
+    "repo": "string",
+    "run_id": "string",
+    "actions": "ActionResult[]"
+  },
+  "outputs": {
+    "observability-export.json": "JSON export data"
+  }
+}

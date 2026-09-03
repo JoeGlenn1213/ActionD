@@ -1,0 +1,30 @@
+name: nightly
+description: 夜间全量巡检流水线，适用于平台趋势监控
+
+stages:
+  - name: setup
+    steps:
+      - capability: env-check
+
+  - name: comprehensive-quality
+    parallel: true
+    steps:
+      - capability: lint
+      - capability: test-full
+      - capability: integration-test
+
+  - name: performance
+    steps:
+      - capability: benchmark
+
+  - name: deep-metrics
+    parallel: true
+    steps:
+      - capability: coverage-report
+      - capability: security-scan
+      - capability: dependency-graph
+
+  - name: observability
+    always_run: true
+    steps:
+      - capability: observability-export

@@ -1,0 +1,44 @@
+# ActionD Configuration
+# Declarative action scheduling
+#
+# ⚠️ 示例配置：下方 docgen-deepwiki / arch-drawio-mcp / code-review-ai 为占位
+# 插件名，plugins/ 目录中不存在。实际可用插件见 `actiond plugins list` 或
+# plugins/ 目录（如 go-build、python-pytest、web-build）。文件底部的 event_source /
+# workers / artifacts 配置段为真实可用格式。
+
+actions:
+  - name: docgen
+    plugin: docgen-deepwiki
+    on:
+      - git.push
+    when:
+      branch: main
+    budget:
+      max_files: 30
+      max_lines: 3000
+
+  - name: arch
+    plugin: arch-drawio-mcp
+    on:
+      - git.push
+
+  - name: review
+    plugin: code-review-ai
+    on:
+      - git.push
+    when:
+      branch: "*"
+
+# Event source configuration
+event_source:
+  type: socket
+  path: ~/.localgithub/lgh.sock
+
+# Worker pool configuration
+workers:
+  count: 2
+  timeout: 300s
+
+# Artifact storage
+artifacts:
+  path: ~/.localgithub/actions/

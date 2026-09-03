@@ -1,0 +1,24 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "benchmark",
+  "name": "benchmark",
+  "version": "1.0.0",
+  "description": "Run performance benchmarks and compare with baseline",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["*"],
+  "timeout": "30m",
+  "artifacts": ["benchmark-report.json"],
+  "capability": "test",
+  "owner_layer": "optional",
+  "maturity": "beta",
+  "status": "enabled",
+  "supported_profiles": ["full"],
+  "inputs": {
+    "repo": "string"
+  },
+  "outputs": {
+    "benchmark-report.json": "Benchmark comparison results"
+  }
+}

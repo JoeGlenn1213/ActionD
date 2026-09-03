@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "go-race",
+  "name": "go-race",
+  "version": "1.0.0",
+  "description": "Run Go tests with the race detector (go test -race ./...)",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["go"],
+  "timeout": "5m",
+  "artifacts": ["race-report.txt"],
+  "capability": "test",
+  "owner_layer": "optional",
+  "maturity": "experimental",
+  "status": "enabled",
+  "supported_profiles": ["full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "race-report.txt": "go test -race combined stdout/stderr report"
+  }
+}

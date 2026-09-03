@@ -1,0 +1,55 @@
+# Binaries
+/actiond
+*.exe
+
+# Build artifacts
+dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+vendor/
+
+# Build outputs / reports
+coverage.out
+checkstyle-*
+
+# Logs
+*.log
+
+# Local binaries
+bin/
+
+# Go build cache (must never be committed)
+.gocache/
+
+# Python plugin smoke-test artifacts
+__pycache__/
+*.pyc
+
+# Secrets / credentials (never commit)
+.env*
+*.pem
+*.key
+
+# Generated AI index artifacts
+.deepwiki_index/
+.deepwiki_temp/
+
+# Local test / report run outputs
+test-results/
+
+# Local deployment state & internal agent workflows
+.deploy/
+.agent/
+
+# Internal workspace docs & planning notes (not part of the public repo)
+docs/global/
+PLAN_*.md

@@ -1,0 +1,25 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "container-package",
+  "name": "container-package",
+  "version": "1.0.0",
+  "description": "Build and package artifacts (Go binary / Python wheel+sdist / Java jar / npm tarball; optionally a Docker image)",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.tag"],
+  "languages": ["*"],
+  "timeout": "15m",
+  "artifacts": ["package-manifest.json"],
+  "capability": "build",
+  "owner_layer": "optional",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["release"],
+  "inputs": {
+    "repo": "string",
+    "artifacts": "string[]"
+  },
+  "outputs": {
+    "package-manifest.json": "Built artifact manifest (paths, types, checksums)"
+  }
+}

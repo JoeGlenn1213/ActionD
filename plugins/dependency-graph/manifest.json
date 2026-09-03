@@ -1,0 +1,24 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "dependency-graph",
+  "name": "dependency-graph",
+  "version": "1.0.0",
+  "description": "Generate project dependency graph visualization",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["*"],
+  "timeout": "2m",
+  "artifacts": ["dependency-graph.json"],
+  "capability": "utility",
+  "owner_layer": "optional",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["full"],
+  "inputs": {
+    "repo": "string"
+  },
+  "outputs": {
+    "dependency-graph.json": "JSON dependency graph"
+  }
+}

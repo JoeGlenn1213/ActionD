@@ -1,0 +1,25 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "security-scan",
+  "name": "security_scan",
+  "version": "1.0.0",
+  "description": "Scan for dependency vulnerabilities, secrets leakage and license compliance",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["go", "python", "java", "typescript"],
+  "timeout": "5m",
+  "artifacts": ["security-report.json"],
+  "capability": "security",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["full", "release"],
+  "inputs": {
+    "repo": "string",
+    "languages": "string[]"
+  },
+  "outputs": {
+    "security-report.json": "JSON security scan report"
+  }
+}

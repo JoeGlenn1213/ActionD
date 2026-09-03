@@ -1,0 +1,40 @@
+name: full
+description: 全面回归流水线，适用于 PR 合并前或每日主链回归
+
+stages:
+  - name: setup
+    steps:
+      - plugin: env-check
+      - plugin: affected-scope
+
+  - name: code-quality
+    parallel: true
+    steps:
+      - plugin: go-lint
+      - plugin: go-test-fast
+
+  - name: integration
+    steps:
+      - plugin: integration-test
+
+  - name: metrics
+    parallel: true
+    steps:
+      - plugin: coverage-report
+      - plugin: dependency-graph
+
+  - name: security
+    steps:
+      - plugin: security-scan
+
+  - name: governance
+    steps:
+      - plugin: policy-gate
+        with:
+          ruleset: full-default
+      - plugin: artifact_manifest
+
+  - name: observability
+    always_run: true
+    steps:
+      - plugin: observability-export

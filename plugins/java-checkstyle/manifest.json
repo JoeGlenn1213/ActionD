@@ -1,0 +1,24 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "java-checkstyle",
+  "name": "java-checkstyle",
+  "version": "1.0.0",
+  "description": "Run checkstyle for Java projects",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["java"],
+  "timeout": "5m",
+  "artifacts": ["checkstyle-report.xml"],
+  "capability": "lint",
+  "owner_layer": "optional",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full"],
+  "inputs": {
+    "repo": "string"
+  },
+  "outputs": {
+    "checkstyle-report.xml": "Checkstyle XML report"
+  }
+}

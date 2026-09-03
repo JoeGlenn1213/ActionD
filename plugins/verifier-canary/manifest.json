@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "verifier-canary",
+  "name": "verifier-canary",
+  "version": "1.0.0",
+  "description": "ASSURANCE Phase B: meta-verification of the verdict pipeline. Known must-fail and must-pass Go fixtures must produce the expected verdicts (mutation testing on the verifier itself); any mismatch fails the job (fail-closed).",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["*"],
+  "repoFilter": "ActionD.git",
+  "timeout": "3m",
+  "capability": "governance",
+  "owner_layer": "assurance",
+  "maturity": "experimental",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "verdict": "success | error — canary fixture check result"
+  }
+}

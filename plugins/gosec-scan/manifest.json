@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "gosec-scan",
+  "name": "gosec-scan",
+  "version": "1.0.0",
+  "description": "Go security scan using gosec (block on HIGH severity findings)",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["go"],
+  "timeout": "5m",
+  "artifacts": ["gosec-report.json"],
+  "capability": "security",
+  "owner_layer": "optional",
+  "maturity": "experimental",
+  "status": "enabled",
+  "supported_profiles": ["full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "gosec-report.json": "gosec JSON security report"
+  }
+}

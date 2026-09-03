@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "env-check",
+  "name": "env-check",
+  "version": "1.0.0",
+  "description": "Check language runtimes and toolchain versions",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["*"],
+  "timeout": "1m",
+  "artifacts": ["env-report.json"],
+  "capability": "utility",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "env-report.json": "JSON report of detected runtimes"
+  }
+}

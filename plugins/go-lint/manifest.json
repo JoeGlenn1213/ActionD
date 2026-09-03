@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "go-lint",
+  "name": "go-lint",
+  "version": "1.0.0",
+  "description": "Run golangci-lint for Go projects",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["go"],
+  "timeout": "5m",
+  "artifacts": ["lint-report.json"],
+  "capability": "lint",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "lint-report.json": "JSON lint results"
+  }
+}

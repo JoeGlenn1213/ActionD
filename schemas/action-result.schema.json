@@ -1,0 +1,97 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ActionResult Schema",
+  "description": "Standard output format for all actiond plugins.",
+  "type": "object",
+  "properties": {
+    "action_id": { "type": "string" },
+    "plugin_id": { "type": "string" },
+    "capability": { "type": "string" },
+    "language": { "type": ["string", "null"] },
+    
+    "status": {
+      "type": "string",
+      "enum": ["success", "failed", "skipped", "blocked", "warning"]
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["pass", "soft-pass", "needs-review", "deny"]
+    },
+    
+    "timing": {
+      "type": "object",
+      "properties": {
+        "started_at": { "type": "string", "format": "date-time" },
+        "finished_at": { "type": "string", "format": "date-time" },
+        "duration_ms": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["started_at", "finished_at", "duration_ms"]
+    },
+    
+    "context": {
+      "type": "object",
+      "properties": {
+        "repo": { "type": "string" },
+        "module": { "type": "string" },
+        "commit_sha": { "type": "string" },
+        "trigger": { "type": "string" },
+        "profile": { "type": "string" }
+      }
+    },
+    
+    "summary": {
+      "type": "object",
+      "properties": {
+        "message": { "type": "string" },
+        "counts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        }
+      },
+      "required": ["message"]
+    },
+    
+    "hints": {
+      "type": "array",
+      "description": "AI-friendly hints for next steps to fix issues",
+      "items": { "type": "string" }
+    },
+    
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "type": { "type": "string" }
+        },
+        "required": ["name", "path"]
+      }
+    },
+    
+    "signals": {
+      "type": "object",
+      "description": "Key metrics extracted for policy gate decisions.",
+      "additionalProperties": {
+        "type": ["number", "boolean", "string", "null"]
+      }
+    },
+    
+    "raw_outputs": {
+      "type": "object",
+      "properties": {
+        "log_path": { "type": "string" },
+        "report_path": { "type": "string" }
+      }
+    },
+    
+    "next_actions": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "required": [
+    "action_id", "plugin_id", "capability", "status", "decision", "timing", "summary"
+  ]
+}

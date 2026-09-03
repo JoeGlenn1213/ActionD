@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "coverage-report",
+  "name": "coverage_report",
+  "version": "1.0.0",
+  "description": "Collect and report test coverage metrics with diff analysis",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["go", "python", "java", "typescript"],
+  "timeout": "5m",
+  "artifacts": ["coverage-report.json", "coverage-diff.json"],
+  "capability": "test",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "coverage-report.json": "Full coverage report",
+    "coverage-diff.json": "Diff coverage vs main branch"
+  }
+}

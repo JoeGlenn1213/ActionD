@@ -1,0 +1,24 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "python-pytest",
+  "name": "python-pytest",
+  "version": "1.0.0",
+  "description": "Run pytest for Python projects",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["python"],
+  "timeout": "10m",
+  "artifacts": ["test-report.json"],
+  "capability": "test",
+  "owner_layer": "optional",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string"
+  },
+  "outputs": {
+    "test-report.json": "Pytest results"
+  }
+}

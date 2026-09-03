@@ -1,0 +1,27 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "deploy",
+  "name": "deploy",
+  "version": "1.0.0",
+  "description": "Deploy built artifacts to target environment",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.tag"],
+  "languages": ["*"],
+  "timeout": "30m",
+  "artifacts": ["deploy-report.json"],
+  "capability": "deploy",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["release"],
+  "inputs": {
+    "repo": "string",
+    "tag": "string",
+    "artifacts": "string[]",
+    "environment": "string"
+  },
+  "outputs": {
+    "deploy-report.json": "Deployment report"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "python-build",
+  "name": "python-build",
+  "version": "1.0.0",
+  "description": "Build Python packages (wheel, sdist)",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.tag"],
+  "languages": ["python"],
+  "timeout": "10m",
+  "artifacts": ["dist/"],
+  "capability": "build",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "dist/": "Directory of built packages"
+  }
+}

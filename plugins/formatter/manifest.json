@@ -1,0 +1,22 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "formatter",
+  "name": "formatter",
+  "version": "1.0.0",
+  "description": "Auto-format code files to maintain style consistency",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["*"],
+  "timeout": "2m",
+  "artifacts": [],
+  "capability": "lint",
+  "owner_layer": "optional",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["full"],
+  "inputs": {
+    "repo": "string"
+  },
+  "outputs": {}
+}

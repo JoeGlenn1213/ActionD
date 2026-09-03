@@ -1,0 +1,27 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "java-build",
+  "name": "java-build",
+  "version": "1.0.0",
+  "description": "Build Java projects with Maven or Gradle",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.tag"],
+  "languages": ["java"],
+  "timeout": "10m",
+  "artifacts": ["target/", "build/"],
+  "capability": "build",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["release"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "target/": "Maven build output",
+    "build/": "Gradle build output"
+  }
+}

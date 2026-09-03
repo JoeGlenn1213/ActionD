@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "release-note",
+  "name": "release-note",
+  "version": "1.0.0",
+  "description": "Generate release notes from git commits and PRs",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.tag"],
+  "languages": ["*"],
+  "timeout": "1m",
+  "artifacts": ["RELEASE_NOTES.md"],
+  "capability": "utility",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["release"],
+  "inputs": {
+    "repo": "string",
+    "tag": "string",
+    "since": "string"
+  },
+  "outputs": {
+    "RELEASE_NOTES.md": "Generated release notes"
+  }
+}

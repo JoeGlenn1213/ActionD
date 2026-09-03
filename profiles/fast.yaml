@@ -1,0 +1,29 @@
+name: fast
+description: 快速反馈流水线，适用于 push 级轻量校验
+
+stages:
+  - name: setup
+    steps:
+      - plugin: env-check
+      - plugin: affected-scope
+
+  - name: code-quality
+    parallel: true
+    steps:
+      - plugin: go-lint
+      - plugin: go-test-fast
+
+  - name: metrics
+    steps:
+      - plugin: coverage-report
+
+  - name: governance
+    steps:
+      - plugin: policy-gate
+        with:
+          ruleset: fast-default
+
+  - name: observability
+    always_run: true
+    steps:
+      - plugin: observability-export

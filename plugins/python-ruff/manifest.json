@@ -1,0 +1,24 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "python-ruff",
+  "name": "python-ruff",
+  "version": "1.0.0",
+  "description": "Run ruff linter for Python projects",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["python"],
+  "timeout": "3m",
+  "artifacts": ["lint-report.json"],
+  "capability": "lint",
+  "owner_layer": "optional",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full"],
+  "inputs": {
+    "repo": "string"
+  },
+  "outputs": {
+    "lint-report.json": "Ruff lint results"
+  }
+}

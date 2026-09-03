@@ -1,0 +1,26 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "go-test-fast",
+  "name": "go-test-fast",
+  "version": "1.0.0",
+  "description": "Run fast Go unit tests (skip integration tests)",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["go"],
+  "timeout": "5m",
+  "artifacts": ["test-report.json"],
+  "capability": "test",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full"],
+  "inputs": {
+    "repo": "string",
+    "branch": "string",
+    "commit_sha": "string"
+  },
+  "outputs": {
+    "test-report.json": "JSON test results"
+  }
+}

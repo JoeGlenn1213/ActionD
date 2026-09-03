@@ -1,0 +1,24 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "python-mypy",
+  "name": "python-mypy",
+  "version": "1.0.0",
+  "description": "Run mypy static type checking gate for Python projects",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["python"],
+  "timeout": "5m",
+  "artifacts": ["mypy-report.txt"],
+  "capability": "typecheck",
+  "owner_layer": "optional",
+  "maturity": "experimental",
+  "status": "enabled",
+  "supported_profiles": ["fast", "full", "release"],
+  "inputs": {
+    "repo": "string"
+  },
+  "outputs": {
+    "mypy-report.txt": "Mypy static type checking report"
+  }
+}

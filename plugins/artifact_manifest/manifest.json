@@ -1,0 +1,25 @@
+{
+  "apiVersion": "actiond.dev/v1",
+  "id": "artifact-manifest",
+  "name": "artifact_manifest",
+  "version": "1.0.0",
+  "description": "Generate build artifact manifest with checksums and metadata",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push", "git.tag"],
+  "languages": ["*"],
+  "timeout": "1m",
+  "artifacts": ["artifact-manifest.json"],
+  "capability": "utility",
+  "owner_layer": "core",
+  "maturity": "stable",
+  "status": "enabled",
+  "supported_profiles": ["full", "release"],
+  "inputs": {
+    "repo": "string",
+    "artifacts": "string[]"
+  },
+  "outputs": {
+    "artifact-manifest.json": "JSON manifest with checksums"
+  }
+}
