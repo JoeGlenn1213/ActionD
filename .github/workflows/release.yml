@@ -36,8 +36,9 @@ jobs:
 
       - name: Build
         run: |
+          LDFLAGS="-s -w -X main.BuildDate=$(date +%Y-%m-%d) -X main.GitCommit=${GITHUB_SHA:0:7}"
           CGO_ENABLED=0 GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -ldflags="-s -w" -o actiond-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/actiond
+            go build -ldflags="$LDFLAGS" -o actiond-${{ matrix.goos }}-${{ matrix.goarch }} ./cmd/actiond
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

@@ -19,10 +19,18 @@ ActionD 是一个轻量级本地 CI/CD 引擎，专为 AI Agent 设计。它监�
 
 ## 安装
 
+### macOS / Linux（Homebrew 一键安装）
+
+```bash
+brew install JoeGlenn1213/tap/actiond
+```
+
+LGH 也可以同样方式安装（`brew install JoeGlenn1213/tap/lgh`）——ActionD 依赖它的 Git 事件。
+
 ### 前置要求
 
-- Go 1.25+
-- Python 3.8+ (用于插件)
+- Go 1.25+（仅源码构建需要）
+- Python 3.8+（用于插件）
 - [LGH](https://github.com/JoeGlenn1213/lgh) 本地运行
 
 ### 从源码构建

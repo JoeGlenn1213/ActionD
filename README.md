@@ -19,9 +19,17 @@ ActionD is a lightweight local CI/CD engine designed for AI agents. It listens t
 
 ## Installation
 
+### macOS / Linux (Homebrew)
+
+```bash
+brew install JoeGlenn1213/tap/actiond
+```
+
+Install LGH the same way (`brew install JoeGlenn1213/tap/lgh`) — ActionD listens to its git events.
+
 ### Prerequisites
 
-- Go 1.25+
+- Go 1.25+ (only when building from source)
 - Python 3.8+ (used by plugins)
 - [LGH](https://github.com/JoeGlenn1213/lgh) running locally
 
