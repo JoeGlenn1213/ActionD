@@ -454,9 +454,15 @@ AI: [修改代码...]
 - `actiond://plugins` - 插件列表
 - `actiond://actions` - 执行记录
 
-### 配置 Claude Code
+### 接入你的 AI 客户端
 
-在 `~/.claude/claude_desktop_config.json` 添加：
+ActionD 通过 stdio 说标准 MCP 协议，任何支持 MCP 的客户端都能接（Claude Desktop/Code、Cursor、ZCode、Windsurf 等）。对接受 stdio 命令的客户端，服务端就是一条命令：
+
+```bash
+actiond mcp
+```
+
+以 Claude Code 为例——在 `~/.claude/claude_desktop_config.json` 添加：
 
 ```json
 {

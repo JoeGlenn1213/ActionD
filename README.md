@@ -455,9 +455,15 @@ Result: ✅ All passed (2 plugins)
 - `actiond://plugins` — plugin list
 - `actiond://actions` — execution records
 
-### Configuring Claude Code
+### Connecting your AI client
 
-Add to `~/.claude/claude_desktop_config.json`:
+ActionD speaks standard MCP over stdio, so any MCP-capable client works (Claude Desktop/Code, Cursor, ZCode, Windsurf, ...). For clients that take a stdio command, the server is simply:
+
+```bash
+actiond mcp
+```
+
+Example for Claude Code — add to `~/.claude/claude_desktop_config.json`:
 
 ```json
 {
