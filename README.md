@@ -396,7 +396,6 @@ ACTIOND_MCP_ALLOW_LIFECYCLE=1 actiond mcp
 | `actiond_server_restart` | Restart the ActionD service (protects running jobs by default) |
 | `actiond_job_wait` | Block until a job finishes and return its result; supports a timeout parameter |
 | `actiond_job_cancel` | Cancel a job (validates state; terminal jobs are rejected) |
-| `actiond_cancel` | Cancel a job (deprecated: prefer `actiond_job_cancel`) |
 | `actiond_job_retry` | Retry a failed job |
 | `actiond_diagnose` | **AI failure diagnosis**: root-cause analysis + classification + fix suggestions (the first tool to reach for when CI fails) |
 | `dev_cycle_run` | **End-to-end dev loop**: commit → CI → results (V1.0.8+) |

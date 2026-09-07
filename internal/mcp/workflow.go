@@ -116,33 +116,34 @@ func registerWorkflowTools(s *server.MCPServer, client ActionDClient, lghClient 
 	// dev_cycle_run - End-to-end development cycle
 	s.AddTool(
 		mcp.NewTool("dev_cycle_run",
-			mcp.WithDescription(`端到端开发循环：提交代码 → 触发CI → 等待结果 → 返回汇总
-
-这是一个聚合工具，内部自动完成：
-1. lgh up: 提交并推送代码到 LGH
-2. 等待 ActionD 触发的 CI/CD 任务完成
-3. 收集所有任务结果并返回结构化输出
-
-适用场景：AI 修改代码后，一键完成提交、测试、验证的完整流程。`),
+			mcp.WithDescription(`Run the end-to-end development loop — commit, trigger CI, wait for results, return a summary — in a single aggregated call. Internally it: (1) commits and pushes the working tree via "lgh up" (requires the LGH daemon running), (2) waits for the ActionD CI/CD jobs triggered by that push, and (3) collects every job result into one structured output. Requires a message (the commit text); optional path (repo directory, defaults to the MCP client's working directory), timeout in seconds (default 300), profile (fast/full/release — switched temporarily for this run and restored afterwards; omit to keep the current profile), and auto_rollback (default false; on failure, resets the repo to the pre-push commit). Use it after editing code to commit, test, and verify in one step; the result reports success, the commit sha, per-job statuses with durations, artifacts, rollback info when applicable, and a human-readable summary.`),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Run end-to-end dev cycle",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(false),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("path",
-				mcp.Description("仓库路径（默认当前目录）"),
+				mcp.Description("Repository path (defaults to the MCP client's working directory)"),
 			),
 			mcp.WithString("message",
 				mcp.Required(),
-				mcp.Description("提交信息"),
+				mcp.Description("Git commit message"),
 			),
 			mcp.WithNumber("timeout",
-				mcp.Description("等待超时秒数（默认 300 = 5分钟）"),
+				mcp.Description("Wait timeout in seconds (default 300 = 5 minutes)"),
 			),
 			withInteger("timeout"),
 			mcp.WithBoolean("auto_rollback",
-				mcp.Description("失败时自动回滚到上一个 commit（默认 false）"),
+				mcp.Description("On failure, automatically roll back to the previous commit (default false)"),
 			),
 			mcp.WithString("profile",
-				mcp.Description(`执行 profile：fast/full/release（默认不切换，保持当前设置）
-- fast: 最小 CI，只跑核心 lint 和 test
-- full: 完整 CI，加上安全扫描、覆盖率等
-- release: 完整 CI/CD，加上 build 和 deploy`),
+				mcp.Enum("fast", "full", "release"),
+				mcp.Description(`Execution profile for this run: fast/full/release (default: keep the current setting)
+- fast: minimal CI, core lint and test only
+- full: complete CI, adds security scan, coverage, etc.
+- release: full CI/CD, adds build and deploy`),
 			),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -153,32 +154,25 @@ func registerWorkflowTools(s *server.MCPServer, client ActionDClient, lghClient 
 	// actiond_job_wait - Wait for job completion
 	s.AddTool(
 		mcp.NewTool("actiond_job_wait",
-			mcp.WithDescription("等待指定的 CI/CD 任务完成，返回最终状态。建议在 lgh_up 返回 triggered_job_ids 后立即调用。"),
+			mcp.WithDescription("Block until the given CI/CD job reaches a terminal status (done/failed/error/cancelled), then return the full job detail. Call it right after a push surfaces job IDs — for example, immediately after \"lgh up\" reports triggered_job_ids. The optional timeout in seconds (default 300) aborts the wait with an error if the job is still unfinished; it never cancels the job itself. Prefer this over polling actiond_action_get; use actiond_job_cancel to abort a stuck job instead."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Wait for CI/CD job completion",
+				ReadOnlyHint:    mcp.ToBoolPtr(true),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("id",
 				mcp.Required(),
-				mcp.Description("任务 ID"),
+				mcp.Description("Job ID to wait for"),
 			),
 			mcp.WithNumber("timeout",
-				mcp.Description("超时秒数（默认 300）"),
+				mcp.Description("Timeout in seconds (default 300)"),
 			),
 			withInteger("timeout"),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return handleJobWait(client, ctx, request)
-		},
-	)
-
-	// actiond_cancel - Cancel a running job
-	s.AddTool(
-		mcp.NewTool("actiond_cancel",
-			mcp.WithDescription("取消正在运行的 CI/CD 任务（Deprecated：推荐使用 actiond_job_cancel，它会先校验 job 状态并拒绝终态任务）"),
-			mcp.WithString("id",
-				mcp.Required(),
-				mcp.Description("任务 ID"),
-			),
-		),
-		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-			return handleCancel(client, ctx, request)
 		},
 	)
 }
@@ -471,22 +465,6 @@ func handleJobWait(client ActionDClient, ctx context.Context, request mcp.CallTo
 	}
 
 	return mcp.NewToolResultError(fmt.Sprintf("Timeout waiting for job %s after %d seconds", id, timeout)), nil
-}
-
-func handleCancel(client ActionDClient, ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
-	args := getArgsMap(request)
-
-	id := getString(args, "id")
-	if id == "" {
-		return mcp.NewToolResultError("Missing required parameter: id"), nil
-	}
-
-	err := client.CancelAction(id)
-	if err != nil {
-		return mcp.NewToolResultError("Failed to cancel action: " + err.Error()), nil
-	}
-
-	return mcp.NewToolResultText(fmt.Sprintf("Successfully cancelled action %s", id)), nil
 }
 
 // getString gets a string argument with default

@@ -171,7 +171,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_status - Get ActionD server status
 	s.AddTool(
 		mcp.NewTool("actiond_status",
-			mcp.WithDescription("Get ActionD server status including running state, version, and statistics"),
+			mcp.WithDescription("Check whether the ActionD CI/CD server is reachable and capture its vitals in one call. Returns JSON with running state, version, uptime, registered plugin count, and recent action count. Safe to call at any time with no side effects; use it first when diagnosing connectivity, and prefer actiond_log for execution errors or actiond_actions_list for job history."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Get ActionD server status",
+				ReadOnlyHint:    mcp.ToBoolPtr(true),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return handleStatus(client, ctx, request)
@@ -181,7 +188,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_plugins_list - List all plugins
 	s.AddTool(
 		mcp.NewTool("actiond_plugins_list",
-			mcp.WithDescription("List all CI/CD plugins available in ActionD. Shows plugin name, triggers (git.push/git.tag), supported languages, and enabled status."),
+			mcp.WithDescription("List every CI/CD plugin registered in ActionD, both enabled and disabled. Each entry includes name, trigger events (git.push/git.tag), supported languages, optional repo filter, type (built-in/custom exec), and current enabled state. Read-only; use it to discover valid plugin names before calling actiond_plugin_enable/actiond_plugin_disable, and actiond_plugins_recommend when you want suggestions instead of a raw inventory."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "List CI/CD plugins",
+				ReadOnlyHint:    mcp.ToBoolPtr(true),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return handlePluginsList(client, ctx, request)
@@ -191,7 +205,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_actions_list - List recent actions/jobs
 	s.AddTool(
 		mcp.NewTool("actiond_actions_list",
-			mcp.WithDescription("List recent CI/CD actions/jobs executed by ActionD. Shows job ID, repository, plugin used, status (done/failed/running), and duration."),
+			mcp.WithDescription("List the most recent CI/CD jobs executed by ActionD. Each row carries id, repo, plugin_name, status (done/failed/running/pending/cancelled), created_at, and duration_ms, so failures can be spotted at a glance and filtered client-side by status. Optional limit caps the number of rows (default 20). Use this for an overview; use actiond_action_get for one job's full detail, actiond_job_wait to block on a specific job, and actiond_diagnose for root-cause analysis of failures."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "List recent CI/CD jobs",
+				ReadOnlyHint:    mcp.ToBoolPtr(true),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithNumber("limit",
 				mcp.Description("Maximum number of actions to return (default: 20)"),
 			),
@@ -205,7 +226,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_action_get - Get action details
 	s.AddTool(
 		mcp.NewTool("actiond_action_get",
-			mcp.WithDescription("Get detailed information about a specific CI/CD action/job, including commit info, progress, and execution times."),
+			mcp.WithDescription("Fetch full detail for one CI/CD job by its ID. Returns id, repo, plugin_name, status, live progress line, created/started/ended timestamps, duration_ms, and the commit map (hash, message, author) that triggered the job. Works for running jobs (poll to watch progress) and for terminal jobs (done/failed/cancelled), whose records are kept for post-mortem review — pair with actiond_log to replay the job's log lines or actiond_diagnose for interpreted failure causes. Errors when the ID does not exist."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Get CI/CD job details",
+				ReadOnlyHint:    mcp.ToBoolPtr(true),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("id",
 				mcp.Required(),
 				mcp.Description("The action/job ID to retrieve"),
@@ -219,7 +247,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_cleanup - Delete old terminal actions to reclaim disk space
 	s.AddTool(
 		mcp.NewTool("actiond_cleanup",
-			mcp.WithDescription("Delete old completed/failed/cancelled actions and their artifact directories to reclaim disk space. Only terminal jobs are ever deleted; pending/running jobs are preserved. Default retention is 7 days; use days=0 or all=true to delete every terminal job."),
+			mcp.WithDescription("Reclaim disk space by deleting terminal CI/CD jobs (done/failed/cancelled) and their artifact directories. Pending and running jobs are never deleted. Default retention is 7 days; pass days=0 or all=true to delete every terminal job. Destructive and irreversible: deleted job records and artifacts cannot be recovered, so confirm intent — especially with all=true — before calling. Returns a summary with deleted_jobs, deleted_dirs, and the retention window applied."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Delete old CI/CD jobs",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(true),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithNumber("days",
 				mcp.Description("Retention window in days (default 7; 0 = all terminal jobs)"),
 			),
@@ -236,7 +271,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_plugins_reload - Hot reload plugins
 	s.AddTool(
 		mcp.NewTool("actiond_plugins_reload",
-			mcp.WithDescription("Hot reload plugins without restarting ActionD. Scans plugin directories for new manifest.json files and updates the plugin registry."),
+			mcp.WithDescription("Hot-reload the ActionD plugin registry without restarting the server. Scans the plugin directories for new or changed manifest.json files and updates the registry in place, so newly added plugins become available immediately. Use it after adding, editing, or removing a plugin manifest, then verify the result with actiond_plugins_list. Returns status, the number of loaded plugins, and the plugin list."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Reload plugin registry",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return handlePluginsReload(client, ctx, request)
@@ -246,7 +288,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_log - View server logs
 	s.AddTool(
 		mcp.NewTool("actiond_log",
-			mcp.WithDescription("View ActionD server runtime logs. Shows plugin execution results, errors, and system events."),
+			mcp.WithDescription("Read recent ActionD server runtime log entries. Each entry carries timestamp, level (info/warn/error/plugin), and message; plugin execution results and system events appear here. Optional limit caps the number of entries returned (default 20). Read-only; use it to inspect raw output after actiond_actions_list or actiond_action_get surfaces a failure, and prefer actiond_diagnose when you want errors interpreted into root cause and fix steps."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "View server logs",
+				ReadOnlyHint:    mcp.ToBoolPtr(true),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithNumber("limit",
 				mcp.Description("Number of log entries to return (default: 20)"),
 			),
@@ -260,7 +309,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_server_start - Start ActionD server
 	s.AddTool(
 		mcp.NewTool("actiond_server_start",
-			mcp.WithDescription("Start ActionD server in daemon mode. Requires ACTIOND_MCP_ALLOW_LIFECYCLE=1 in MCP server environment."),
+			mcp.WithDescription("Start the ActionD server in daemon mode. Refuses with a clear error unless ACTIOND_MCP_ALLOW_LIFECYCLE=1 is set in the MCP server environment (lifecycle control is disabled by default as a safety gate). Starting an already-running server is a no-op that reports the current state. Returns an action/changed/running/message envelope plus daemon output; verify health afterwards with actiond_status."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Start ActionD server",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return handleServerStart(client, lifecycle, ctx, request)
@@ -270,7 +326,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_server_stop - Stop ActionD server
 	s.AddTool(
 		mcp.NewTool("actiond_server_stop",
-			mcp.WithDescription("Stop ActionD server. Requires ACTIOND_MCP_ALLOW_LIFECYCLE=1. Refuses when jobs are pending/running unless force=true."),
+			mcp.WithDescription("Stop the ActionD server daemon. Requires ACTIOND_MCP_ALLOW_LIFECYCLE=1 in the MCP server environment; the call is refused with a clear error otherwise. By default it protects in-flight work: it refuses and lists the pending/running jobs unless force=true is passed, which stops the server even while jobs are executing (those jobs are interrupted). Stopping an already-stopped server is a no-op. Returns an action/changed/running/message envelope with the daemon output."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Stop ActionD server",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithBoolean("force",
 				mcp.Description("Force stop even when jobs are pending/running"),
 			),
@@ -283,7 +346,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_server_restart - Restart ActionD server
 	s.AddTool(
 		mcp.NewTool("actiond_server_restart",
-			mcp.WithDescription("Restart ActionD server. Requires ACTIOND_MCP_ALLOW_LIFECYCLE=1. Refuses when jobs are pending/running unless force=true."),
+			mcp.WithDescription("Restart the ActionD server daemon (stop, then start again). Requires ACTIOND_MCP_ALLOW_LIFECYCLE=1 in the MCP server environment; the call is refused with a clear error otherwise. By default it protects in-flight work: it refuses and lists the pending/running jobs unless force=true is passed, which restarts even while jobs are executing (those jobs are interrupted). Use it to pick up server-level changes — plugin manifest changes only need actiond_plugins_reload. Returns an action/changed/running/message envelope with combined stop/start output."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Restart ActionD server",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(false),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithBoolean("force",
 				mcp.Description("Force restart even when jobs are pending/running"),
 			),
@@ -296,7 +366,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_job_cancel - Cancel a running job
 	s.AddTool(
 		mcp.NewTool("actiond_job_cancel",
-			mcp.WithDescription("Cancel a running CI/CD job. Only pending or running jobs can be cancelled."),
+			mcp.WithDescription("Cancel a pending or running CI/CD job. Validates the job's state first and refuses terminal jobs (done/failed) with an explanatory error, so an accidental double-cancel is safe. On success the job transitions to cancelled and its record is kept for later review via actiond_action_get. Use actiond_job_retry to re-queue a cancelled or failed job."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Cancel a running CI/CD job",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(false),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("id",
 				mcp.Required(),
 				mcp.Description("Job ID to cancel"),
@@ -310,7 +387,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_job_retry - Retry a failed job
 	s.AddTool(
 		mcp.NewTool("actiond_job_retry",
-			mcp.WithDescription("Retry a failed or cancelled CI/CD job. The job will be queued again for execution."),
+			mcp.WithDescription("Re-queue a failed or cancelled CI/CD job for execution. The job runs again as a fresh execution — every retry takes full time and may fail again, so repeated calls create repeated runs (this is not idempotent). Returns the job ID and plugin name; follow up with actiond_job_wait to block until the retry finishes, or actiond_diagnose if it fails the same way."),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Retry a failed CI/CD job",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(false),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("id",
 				mcp.Required(),
 				mcp.Description("Job ID to retry"),
@@ -324,10 +408,14 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_plugin_enable - Enable a plugin
 	s.AddTool(
 		mcp.NewTool("actiond_plugin_enable",
-			mcp.WithDescription(`Enable a CI/CD plugin for the current project.
-
-When enabled, the plugin will be triggered by its configured events (git.push/git.tag).
-Use this to selectively enable plugins based on project needs.`),
+			mcp.WithDescription(`Enable a CI/CD plugin for the current project. Once enabled, the plugin fires on its configured trigger events (git.push/git.tag) on every subsequent push. The plugin must already be registered — discover exact names with actiond_plugins_list, or use actiond_plugins_recommend when you want guidance on what suits the project. To change the whole CI scope at once, switch the execution profile with actiond_profile_set instead of toggling many plugins individually.`),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Enable a CI/CD plugin",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("name",
 				mcp.Required(),
 				mcp.Description("Plugin name to enable (e.g., 'go-lint', 'security_scan')"),
@@ -341,10 +429,14 @@ Use this to selectively enable plugins based on project needs.`),
 	// actiond_plugin_disable - Disable a plugin
 	s.AddTool(
 		mcp.NewTool("actiond_plugin_disable",
-			mcp.WithDescription(`Disable a CI/CD plugin for the current project.
-
-When disabled, the plugin will NOT be triggered even if its event conditions are met.
-Use this to skip unnecessary checks or speed up CI for specific scenarios.`),
+			mcp.WithDescription(`Disable a CI/CD plugin for the current project. Once disabled, the plugin no longer triggers even when its event conditions are met — useful for skipping unnecessary checks or shortening CI. The plugin stays registered and can be re-enabled at any time with actiond_plugin_enable; discover exact names with actiond_plugins_list. For broad, preset scope changes prefer actiond_profile_set (fast/full/release).`),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Disable a CI/CD plugin",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("name",
 				mcp.Required(),
 				mcp.Description("Plugin name to disable (e.g., 'benchmark', 'coverage_report')"),
@@ -358,14 +450,14 @@ Use this to skip unnecessary checks or speed up CI for specific scenarios.`),
 	// actiond_plugins_recommend - Get plugin recommendations based on project
 	s.AddTool(
 		mcp.NewTool("actiond_plugins_recommend",
-			mcp.WithDescription(`Intelligent plugin recommendations based on project characteristics.
-
-Analyzes the project and suggests which plugins should be enabled/disabled:
-- Language detection (Go, Python, Java, TypeScript, etc.)
-- Project type (library, service, frontend, etc.)
-- Recommended workflow (CI only, full CI/CD, etc.)
-
-Returns a structured recommendation with reasoning.`),
+			mcp.WithDescription(`Analyze a project directory and recommend which CI/CD plugins to enable or disable. Detects languages (Go, Python, Java, TypeScript, ...), frameworks (React, Next.js, Spring, ...), project type (frontend/backend/fullstack/monorepo), and features (tests, Docker, existing CI) by scanning config files, then returns per-plugin recommendations with category, reasoning, priority, and confidence, plus aggregate enable/disable suggestions and a workflow proposal. Read-only; apply the suggestions with actiond_plugin_enable / actiond_plugin_disable. Optional path defaults to the current directory.`),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Recommend CI/CD plugins",
+				ReadOnlyHint:    mcp.ToBoolPtr(true),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("path",
 				mcp.Description("Project path to analyze (defaults to current directory)"),
 			),
@@ -378,12 +470,14 @@ Returns a structured recommendation with reasoning.`),
 	// actiond_profile_get - Get current execution profile
 	s.AddTool(
 		mcp.NewTool("actiond_profile_get",
-			mcp.WithDescription(`Get the current CI/CD execution profile.
-
-Returns the active profile name and description:
-- "fast": Minimal CI - core lint and test only (2-3 jobs per push)
-- "full": Complete CI - adds security scan, coverage, formatting (6-10 jobs)
-- "release": Full CI/CD - adds build, deploy, release notes (10-15 jobs)`),
+			mcp.WithDescription(`Get the execution profile that controls which CI/CD plugins run on each push. Returns the active profile name plus a description of what it triggers: "fast" runs minimal CI (core lint and test only, 2-3 jobs per push) for quick feedback during development; "full" adds security scan, coverage, and formatting checks (6-10 jobs) for pre-merge verification; "release" adds build, deploy, and release notes (10-15 jobs) for shipping. Read-only; switch profiles with actiond_profile_set and inspect the concrete plugin inventory with actiond_plugins_list.`),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Get execution profile",
+				ReadOnlyHint:    mcp.ToBoolPtr(true),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 			return handleProfileGet(client, ctx, request)
@@ -393,17 +487,17 @@ Returns the active profile name and description:
 	// actiond_profile_set - Set execution profile
 	s.AddTool(
 		mcp.NewTool("actiond_profile_set",
-			mcp.WithDescription(`Set the CI/CD execution profile to control which plugins are triggered.
-
-Profiles control the scope of CI on each push:
-- "fast": Minimal CI - core lint and test only (recommended for development)
-- "full": Complete CI - adds security scan, coverage, formatting
-- "release": Full CI/CD - adds build, deploy, release notes
-
-Use "fast" during active development for quick feedback.
-Switch to "full" before merging or releasing.`),
+			mcp.WithDescription(`Switch the execution profile that controls which CI/CD plugins run on each push. Accepts exactly one of: "fast" (minimal CI — core lint and test only, recommended during active development for quick feedback), "full" (complete CI — adds security scan, coverage, and formatting; switch before merging), or "release" (full CI/CD — adds build, deploy, and release notes). The change applies globally and takes effect on the next triggered event. Returns the new profile; verify the current one any time with actiond_profile_get.`),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Set execution profile",
+				ReadOnlyHint:    mcp.ToBoolPtr(false),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("profile",
 				mcp.Required(),
+				mcp.Enum("fast", "full", "release"),
 				mcp.Description(`Execution profile: "fast", "full", or "release"`),
 			),
 		),
@@ -415,21 +509,19 @@ Switch to "full" before merging or releasing.`),
 	// actiond_diagnose - Diagnose failed CI jobs and provide fix suggestions
 	s.AddTool(
 		mcp.NewTool("actiond_diagnose",
-			mcp.WithDescription(`Diagnose failed CI/CD jobs and provide actionable fix suggestions.
-
-Analyzes recent failed jobs and their logs to:
-- Identify the root cause category (build, test, lint, dependency, permission, etc.)
-- Extract the specific error type and summary
-- Provide concrete hints for fixing the issue
-- Suggest relevant files that may need attention
-
-This is the AI's primary tool for debugging CI failures - use it whenever a job fails
-and you need to help the user understand what went wrong and how to fix it.`),
+			mcp.WithDescription(`Diagnose failed CI/CD jobs and turn their logs into actionable fix suggestions. Pass job_id to analyze one job, or omit it to analyze the most recent failures (optional limit caps how many are analyzed, default 5). For each job it extracts the root-cause category (build/test/lint/dependency/permission/timeout/...), error code, severity, confidence, evidence lines, and the files most likely needing changes; the aggregate summary highlights the most common category with concrete next steps. Jobs without error output are reported explicitly as no_error_output instead of being silently dropped. Reach for this first whenever a job fails; use actiond_log for raw logs and actiond_action_get for job metadata.`),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Diagnose failed CI/CD jobs",
+				ReadOnlyHint:    mcp.ToBoolPtr(true),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("job_id",
 				mcp.Description("Specific job ID to diagnose (optional - if not provided, analyzes recent failures)"),
 			),
 			mcp.WithNumber("limit",
-				mcp.Description("最多分析的失败任务数量（默认 5）"),
+				mcp.Description("Maximum number of failed jobs to analyze when no job_id is given (default 5)"),
 			),
 			withInteger("limit"),
 		),

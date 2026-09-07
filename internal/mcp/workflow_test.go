@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// Workflow-tool tests (actiond_cancel, actiond_job_wait, dev_cycle_run, parseEventRecord, findEventIDFromLog).
+// Workflow-tool tests (actiond_job_wait, dev_cycle_run, parseEventRecord, findEventIDFromLog).
 // Shares fakeClient / errBoom / callReq / wantOK / wantErr / bodyText with
 // server_test.go (same package).
 
@@ -40,33 +40,6 @@ func (l *fakeLGH) Save(_ context.Context, path, message string) (string, error) 
 func (l *fakeLGH) Rollback(_ context.Context, path string) (string, error) {
 	l.rollbackCalls = append(l.rollbackCalls, path)
 	return l.rbOut, l.rbErr
-}
-
-// ---------------------------------------------------------------------------
-// actiond_cancel
-// ---------------------------------------------------------------------------
-
-func TestHandleCancel(t *testing.T) {
-	fc := &fakeClient{}
-	r, err := handleCancel(fc, context.Background(), callReq(map[string]any{"id": "j-1"}))
-	wantOK(t, r, err)
-	if body := bodyText(t, r); !strings.Contains(body, "Successfully cancelled action j-1") {
-		t.Errorf("cancel body: %s", body)
-	}
-	if len(fc.cancelledIDs) != 1 || fc.cancelledIDs[0] != "j-1" {
-		t.Errorf("CancelAction = %v, want [j-1]", fc.cancelledIDs)
-	}
-}
-
-func TestHandleCancelMissingID(t *testing.T) {
-	r, err := handleCancel(&fakeClient{}, context.Background(), callReq(nil))
-	wantErr(t, r, err, "Missing required parameter: id")
-}
-
-func TestHandleCancelError(t *testing.T) {
-	fc := &fakeClient{cancelErr: errBoom}
-	r, err := handleCancel(fc, context.Background(), callReq(map[string]any{"id": "j-1"}))
-	wantErr(t, r, err, "Failed to cancel action")
 }
 
 // ---------------------------------------------------------------------------

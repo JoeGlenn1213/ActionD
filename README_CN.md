@@ -395,7 +395,6 @@ ACTIOND_MCP_ALLOW_LIFECYCLE=1 actiond mcp
 | `actiond_server_restart` | 重启 ActionD 服务（默认保护运行中任务） |
 | `actiond_job_wait` | 阻塞等待指定任务完成并返回结果，支持 timeout 参数 |
 | `actiond_job_cancel` | 取消任务（校验状态，终态任务会被拒绝） |
-| `actiond_cancel` | 取消任务（Deprecated：优先用 `actiond_job_cancel`） |
 | `actiond_job_retry` | 重试失败的任务 |
 | `actiond_diagnose` | **AI 失败诊断**：根因分析 + 分类 + 修复建议（CI 失败时的首选工具） |
 | `dev_cycle_run` | **端到端开发循环**：提交 → CI → 结果（V1.0.8+） |

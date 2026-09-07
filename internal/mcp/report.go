@@ -137,31 +137,28 @@ type CoverageInfo struct {
 func registerRunReportTool(s *server.MCPServer, client ActionDClient) {
 	s.AddTool(
 		mcp.NewTool("actiond_run_report",
-			mcp.WithDescription(`生成 Goal Run Report（ASSURANCE Phase A 骨架，零新存储投影）。
-
-聚合 git log + ActionD 任务 + RMS task report，回答六问：
-1. 做了什么（git 变更，标注 native/reconstructed）
-2. 为什么做（意图/task，unknown 显式）
-3. 做对了吗（verdict 三态：pass/fail/unknown）
-4. 结果可信么（tier/verifier 出处——Phase B 前诚实标注未落地）
-5. 下一位能继续吗（RMS task report 交接状态）
-6. 退得回吗（rollback 证据等级 L0-4 + 可回滚点）
-
-报告自带 Limitations 清单，显式列出 assurance 层尚不能保证什么（防自欺原则）。`),
+			mcp.WithDescription(`Generate a goal run report for a repository: one structured JSON that reconstructs what a run changed and how well it was verified, without writing any new state. Aggregates git log, ActionD CI/CD job verdicts, and — when a task management system report is available — the task's handoff status into sections that answer: what changed (commits), why (declared task intent), did it work (per-job verdicts pass/fail/unknown), how trustworthy the results are (verification depth and verifier provenance), can someone else continue the work, and can it be rolled back (recovery points with evidence levels). Anything not knowable is reported as an explicit "unknown" — never silently converted to pass/fail — and a Limitations list states what the report cannot yet guarantee. Optional path (defaults to the current directory), commit (focus the report on one commit), task_id/project_id (look up the task report), and limit (commits to include, default 10).`),
+			mcp.WithToolAnnotation(mcp.ToolAnnotation{
+				Title:           "Generate goal run report",
+				ReadOnlyHint:    mcp.ToBoolPtr(true),
+				DestructiveHint: mcp.ToBoolPtr(false),
+				IdempotentHint:  mcp.ToBoolPtr(true),
+				OpenWorldHint:   mcp.ToBoolPtr(false),
+			}),
 			mcp.WithString("path",
-				mcp.Description("仓库路径（默认当前目录）"),
+				mcp.Description("Repository path (defaults to the current directory)"),
 			),
 			mcp.WithString("commit",
-				mcp.Description("聚焦某个 commit（缺省为最近 N 个提交）"),
+				mcp.Description("Focus the report on a specific commit (default: the most recent N commits)"),
 			),
 			mcp.WithString("task_id",
-				mcp.Description("RMS task id；提供后报告会查询任务报告与交接状态"),
+				mcp.Description("Task ID; when provided, the report also looks up the task report and its handoff status"),
 			),
 			mcp.WithString("project_id",
-				mcp.Description("RMS project id（默认取仓库名）"),
+				mcp.Description("Project ID in the task management system (defaults to the repository name)"),
 			),
 			mcp.WithNumber("limit",
-				mcp.Description("git log 条数（默认 10）"),
+				mcp.Description("Number of git log commits to include (default 10)"),
 			),
 			withInteger("limit"),
 		),
