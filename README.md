@@ -2,6 +2,10 @@
 
 **Local AI Action Execution Engine for LGH (Local Git Hub)**
 
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://github.com/JoeGlenn1213/ActionD)
+[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![MCP Server score on Glama](https://glama.ai/mcp/servers/JoeGlenn1213/ActionD/badges/score.svg)](https://glama.ai/mcp/servers/JoeGlenn1213/ActionD)
+
 [English](README.md) | [简体中文](README_CN.md)
 
 ActionD is a lightweight local CI/CD engine designed for AI agents. It listens to Git events from [LGH](https://github.com/JoeGlenn1213/lgh) and automatically triggers plugins to run code checks, tests, builds, and more.
