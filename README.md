@@ -21,6 +21,12 @@ ActionD is a lightweight local CI/CD engine designed for AI agents. It listens t
 - 🔄 **End-to-end workflow** — `dev_cycle_run` does it all in one call: commit → CI → results
 - ⏮️ **Rollback** — automatically roll back to the previous commit on failure
 
+## Terminology
+
+- **Job** — one CI/CD execution record produced when a plugin reacts to a Git event. Some tool names (`actiond_action_get`, `actiond_actions_list`) carry the legacy word *action*; it refers to the same object as the `actiond_job_*` tools.
+- **Plugin** — the executable unit registered via `manifest.json` that runs on trigger events (`git.push`, `git.tag`); one plugin run yields one job.
+- **Profile** — the CI scope preset (`fast` / `full` / `release`) controlling which plugins run per push.
+
 ## Installation
 
 ### macOS / Linux (Homebrew)

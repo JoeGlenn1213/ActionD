@@ -21,6 +21,12 @@ ActionD 是一个轻量级本地 CI/CD 引擎，专为 AI Agent 设计。它监�
 - 🔄 **端到端工作流** - `dev_cycle_run` 一键完成：提交 → CI → 结果返回
 - ⏮️ **可回滚** - 失败时自动回滚到上一个 commit
 
+## 术语
+
+- **Job（作业）** — 插件响应 Git 事件产生的一次 CI/CD 执行记录。部分工具名（`actiond_action_get`、`actiond_actions_list`）沿用了旧词 *action*，它与 `actiond_job_*` 系列操作的是同一个对象。
+- **Plugin（插件）** — 通过 `manifest.json` 注册、在触发事件（`git.push`、`git.tag`）时运行的可执行单元；一次插件运行产生一个 job。
+- **Profile（配置档）** — CI 范围预设（`fast` / `full` / `release`），控制每次 push 运行哪些插件。
+
 ## 安装
 
 ### macOS / Linux（Homebrew 一键安装）

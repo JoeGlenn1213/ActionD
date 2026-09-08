@@ -171,7 +171,7 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 	// actiond_status - Get ActionD server status
 	s.AddTool(
 		mcp.NewTool("actiond_status",
-			mcp.WithDescription("Check whether the ActionD CI/CD server is reachable and capture its vitals in one call. Returns JSON with running state, version, uptime, registered plugin count, and recent action count. Safe to call at any time with no side effects; use it first when diagnosing connectivity, and prefer actiond_log for execution errors or actiond_actions_list for job history."),
+			mcp.WithDescription("Check whether the ActionD CI/CD server is reachable and capture its vitals in one call. Returns JSON with running state, version, uptime, registered plugin count, and recent job count. Safe to call at any time with no side effects; use it first when diagnosing connectivity, and prefer actiond_log for execution errors or actiond_actions_list for job history."),
 			mcp.WithToolAnnotation(mcp.ToolAnnotation{
 				Title:           "Get ActionD server status",
 				ReadOnlyHint:    mcp.ToBoolPtr(true),
@@ -214,7 +214,7 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 				OpenWorldHint:   mcp.ToBoolPtr(false),
 			}),
 			mcp.WithNumber("limit",
-				mcp.Description("Maximum number of actions to return (default: 20)"),
+				mcp.Description("Maximum number of jobs to return (default: 20)"),
 			),
 			withInteger("limit"),
 		),
@@ -236,7 +236,7 @@ func registerTools(s *server.MCPServer, client ActionDClient, lifecycle Lifecycl
 			}),
 			mcp.WithString("id",
 				mcp.Required(),
-				mcp.Description("The action/job ID to retrieve"),
+				mcp.Description("The job ID to retrieve"),
 			),
 		),
 		func(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -561,7 +561,7 @@ func registerResources(s *server.MCPServer, client ActionDClient) {
 	s.AddResource(
 		mcp.NewResource("actiond://actions",
 			"Recent Actions",
-			mcp.WithResourceDescription("Recent CI/CD actions executed by ActionD"),
+			mcp.WithResourceDescription("Recent CI/CD jobs executed by ActionD"),
 			mcp.WithMIMEType("application/json"),
 		),
 		func(ctx context.Context, request mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
