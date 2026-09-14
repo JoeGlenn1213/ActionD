@@ -37,6 +37,8 @@ brew install JoeGlenn1213/tap/actiond
 
 Install LGH the same way (`brew install JoeGlenn1213/tap/lgh`) — ActionD listens to its git events.
 
+> The builtin plugin bundle (30+ check plugins) is **embedded in the binary**. `actiond setup` materializes it into `~/.localgithub/plugins`, so a Homebrew or release-download install runs the same checks as a source checkout — no extra asset download needed. The web console is optional: without it the API still runs (see [actiond-web](https://github.com/JoeGlenn1213/actiond-web) or pass `--web-dir`).
+
 ### Prerequisites
 
 - Go 1.25+ (only when building from source)
@@ -57,11 +59,13 @@ make build
 
 ### 1. One-command setup (recommended)
 
-If this is your first run, use `setup` to check dependencies, create the directory layout, and verify the environment:
+If this is your first run, use `setup` to install the builtin plugin bundle (embedded in the binary), check dependencies, create the directory layout, and verify the environment:
 
 ```bash
 actiond setup
 ```
+
+Re-running setup is safe: already-installed plugins and your local edits are never overwritten (use `--force` to reset them to the bundled version, `--skip-plugins` to skip installation entirely).
 
 To also start the daemon in the background right after setup:
 
@@ -427,20 +431,30 @@ edit code → lgh up → wait for CI → return structured results
 | `message` | ✅ | Git commit message |
 | `path` | - | Repository path (defaults to the current directory) |
 | `timeout` | - | Wait timeout in seconds (default 300 = 5 minutes) |
-| `auto_rollback` | - | Auto-rollback on failure (default false) |
+| `profile` | - | fast/full/release for this run (restored afterwards) |
+| `auto_rollback` | - | On a confirmed **failed** verdict, reset to the recorded pre-push commit (default false). Never fires on unverified (`unknown`) runs, and is skipped if HEAD moved or the working tree changed while CI ran |
 
 **Returns:**
 
 ```json
 {
   "success": true,
+  "verification": "pass",
   "commit": "abc123",
   "jobs": [
     {"id": "job-1", "plugin": "go-test-fast", "status": "done", "duration": "2.3s"}
   ],
-  "summary": "✅ All passed (2 plugins)"
+  "summary": "✅ 全部通过 (2 个插件)"
 }
 ```
+
+`verification` is tri-state and `success` is true **only** on `pass` — the same vocabulary and aggregation rule as `actiond_run_report`:
+
+- `pass` — at least one job ran and all of them passed
+- `fail` — at least one job was observed failing
+- `unknown` — zero jobs, a CI query error, or a timeout; never a pass
+
+Jobs are associated to this run by LGH event id, or (fallback) by exact repo name **plus commit sha** — a green job from an older commit or a similarly named repo is never adopted as verification for the current change.
 
 **Typical usage:**
 

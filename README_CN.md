@@ -37,6 +37,8 @@ brew install JoeGlenn1213/tap/actiond
 
 LGH 也可以同样方式安装（`brew install JoeGlenn1213/tap/lgh`）——ActionD 依赖它的 Git 事件。
 
+> 内置插件集（30+ 检查插件）**直接嵌入在二进制里**。`actiond setup` 会将其安装到 `~/.localgithub/plugins`，因此 Homebrew / Release 下载的纯二进制安装与源码安装跑同样的检查，无需额外下载资源。Web 控制台是可选组件：没有它 API 照常运行（参见 [actiond-web](https://github.com/JoeGlenn1213/actiond-web)，或启动时传 `--web-dir`）。
+
 ### 前置要求
 
 - Go 1.25+（仅源码构建需要）
@@ -57,7 +59,7 @@ make build
 
 ### 1. 一键初始化环境 (推荐)
 
-如果你是第一次使用，我们推荐使用 `setup` 命令自动检查依赖、创建目录结构，并验证环境：
+如果你是第一次使用，我们推荐使用 `setup` 命令安装内置插件集（嵌入在二进制中）、检查依赖、创建目录结构，并验证环境：
 
 ```bash
 actiond setup
@@ -66,6 +68,8 @@ actiond setup
 ```bash
 actiond setup --start
 ```
+
+重复执行 setup 是安全的：已安装插件和你的本地修改不会被覆盖（`--force` 可重置为随包版本，`--skip-plugins` 可跳过安装）。
 
 ### 2. 启动服务与检查
 
@@ -426,13 +430,15 @@ ACTIOND_MCP_ALLOW_LIFECYCLE=1 actiond mcp
 | `message` | ✅ | Git 提交信息 |
 | `path` | - | 仓库路径（默认当前目录） |
 | `timeout` | - | 等待超时秒数（默认 300 = 5分钟） |
-| `auto_rollback` | - | 失败时自动回滚（默认 false） |
+| `profile` | - | 本次运行的 fast/full/release profile（结束后恢复原设置） |
+| `auto_rollback` | - | 确认**失败**（fail）时重置到记录的推送前提交（默认 false）。未验证（unknown）绝不自动回滚；等待期间 HEAD 移动或工作区有新改动时跳过并返回原因 |
 
 **返回：**
 
 ```json
 {
   "success": true,
+  "verification": "pass",
   "commit": "abc123",
   "jobs": [
     {"id": "job-1", "plugin": "go-test-fast", "status": "done", "duration": "2.3s"}
@@ -440,6 +446,14 @@ ACTIOND_MCP_ALLOW_LIFECYCLE=1 actiond mcp
   "summary": "✅ 全部通过 (2 个插件)"
 }
 ```
+
+`verification` 为三态，`success` **仅在** `pass` 时为 true——词汇与聚合规则与 `actiond_run_report` 一致：
+
+- `pass` —— 至少一个任务运行且全部通过
+- `fail` —— 观察到至少一个任务失败
+- `unknown` —— 零任务、查询 CI 报错或等待超时；绝不视为通过
+
+任务与本次运行的关联依据 LGH event id，回退时按仓库名精确相等 **加提交 SHA 匹配**——旧提交或同名仓库的绿色结果不会冒充本次修改的验证。
 
 **使用场景：**
 

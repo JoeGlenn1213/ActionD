@@ -24,4 +24,4 @@
 package version
 
 // Version is the canonical ActionD product version.
-var Version = "1.2.1"
+var Version = "1.3.0"
