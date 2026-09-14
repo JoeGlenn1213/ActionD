@@ -1517,6 +1517,8 @@ This is useful for scripts and CI/CD pipelines that need to block until a job fi
 // Setup command flags
 var setupSkipDeps bool
 var setupSkipWeb bool
+var setupSkipPlugins bool
+var setupForce bool
 var setupStart bool
 
 func newSetupCmd() *cobra.Command {
@@ -1527,8 +1529,8 @@ func newSetupCmd() *cobra.Command {
 
 This command sets up:
   • Directory structure (~/.localgithub/*)
+  • Builtin plugin bundle (embedded in the binary, installed to ~/.localgithub/plugins)
   • Dependency checks (Git, Python, Go, Node)
-  • Plugin directories
   • Web assets detection
   • LGH connection verification
 
@@ -1548,7 +1550,9 @@ After running this command, you can start ActionD with 'actiond start -d'.`,
 			result, err := app.RunSetup(app.SetupConfig{
 				SkipDeps:    setupSkipDeps,
 				SkipWeb:     setupSkipWeb,
+				SkipPlugins: setupSkipPlugins,
 				StartDaemon: false, // We'll handle start manually if flag is set
+				Force:       setupForce,
 			})
 			if err != nil {
 				fmt.Printf("\n❌ Setup failed: %v\n", err)
@@ -1561,6 +1565,10 @@ After running this command, you can start ActionD with 'actiond start -d'.`,
 			fmt.Println("📊 Setup Summary")
 			fmt.Println("───────────────────────────────────────────")
 			fmt.Printf("✅ Created %d directories\n", len(result.DirsCreated))
+			if !setupSkipPlugins {
+				fmt.Printf("📦 Plugins: %d installed, %d already present\n",
+					len(result.PluginsInstalled), len(result.PluginsPresent))
+			}
 			if len(result.Warnings) > 0 {
 				fmt.Printf("⚠️  Found %d warnings\n", len(result.Warnings))
 			}
@@ -1616,6 +1624,8 @@ After running this command, you can start ActionD with 'actiond start -d'.`,
 
 	cmd.Flags().BoolVar(&setupSkipDeps, "skip-deps", false, "Skip dependency checks")
 	cmd.Flags().BoolVar(&setupSkipWeb, "skip-web", false, "Skip web assets detection")
+	cmd.Flags().BoolVar(&setupSkipPlugins, "skip-plugins", false, "Skip installing the embedded builtin plugins")
+	cmd.Flags().BoolVar(&setupForce, "force", false, "Force overwrite existing files (incl. builtin plugins)")
 	cmd.Flags().BoolVar(&setupStart, "start", false, "Start ActionD daemon after successful setup")
 
 	return cmd

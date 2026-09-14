@@ -11,14 +11,17 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+
+	actiond "github.com/JoeGlenn1213/actiond"
 )
 
 // SetupConfig holds configuration for setup command
 type SetupConfig struct {
-	SkipDeps    bool // Skip dependency checks
-	SkipWeb     bool // Skip web assets setup
-	StartDaemon bool // Start daemon after setup
-	Force       bool // Force overwrite existing files
+	SkipDeps     bool // Skip dependency checks
+	SkipWeb      bool // Skip web assets setup
+	SkipPlugins  bool // Skip installing the embedded builtin plugin bundle
+	StartDaemon  bool // Start daemon after setup
+	Force        bool // Force overwrite existing files (incl. builtin plugins)
 }
 
 // SetupResult holds the result of setup operation
@@ -28,6 +31,10 @@ type SetupResult struct {
 	Warnings     []string
 	Errors       []string
 	Dependencies map[string]string // name -> version
+
+	// Builtin plugin bundle materialized into ~/.localgithub/plugins.
+	PluginsInstalled []string // written this run
+	PluginsPresent   []string // already installed, left untouched
 }
 
 // DefaultDirs returns the standard ActionD directory structure
@@ -75,13 +82,31 @@ func RunSetup(cfg SetupConfig) (*SetupResult, error) {
 		}
 	}
 
-	// Step 2: Check dependencies
+	// Step 2: Install the embedded builtin plugin bundle. This is what makes
+	// a binary-only install (Homebrew / release download) equal to a source
+	// checkout: without it a fresh install ships zero plugins and no checks
+	// run on any push.
+	if !cfg.SkipPlugins {
+		fmt.Println("\n📦 Installing builtin plugins...")
+		installed, present, perr := InstallBuiltinPlugins(actiond.PluginsFS, dirs["plugins"], cfg.Force)
+		result.PluginsInstalled = installed
+		result.PluginsPresent = present
+		if perr != nil {
+			msg := fmt.Sprintf("builtin plugin install failed: %v", perr)
+			result.Errors = append(result.Errors, msg)
+			fmt.Printf("   ✗ %s\n", msg)
+		} else {
+			fmt.Printf("   ✓ Installed %d plugins (%d already present)\n", len(installed), len(present))
+		}
+	}
+
+	// Step 3: Check dependencies
 	if !cfg.SkipDeps {
 		fmt.Println("\n🔍 Checking dependencies...")
 		checkDeps(result)
 	}
 
-	// Step 3: Check web assets
+	// Step 4: Check web assets
 	if !cfg.SkipWeb {
 		fmt.Println("\n🌐 Checking web assets...")
 		webDir := DetectDefaultWebDir()
