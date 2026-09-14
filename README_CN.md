@@ -411,7 +411,10 @@ ACTIOND_MCP_ALLOW_LIFECYCLE=1 actiond mcp
 | `actiond_job_cancel` | 取消任务（校验状态，终态任务会被拒绝） |
 | `actiond_job_retry` | 重试失败的任务 |
 | `actiond_diagnose` | **AI 失败诊断**：根因分析 + 分类 + 修复建议（CI 失败时的首选工具） |
-| `dev_cycle_run` | **端到端开发循环**：提交 → CI → 结果（V1.0.8+） |
+| `actiond_cleanup` | 清理旧的已完成/失败任务及其工件目录（按保留天数或全部终态任务） |
+| `actiond_run_report` | **目标运行报告**：改了什么 / 为什么 / 验证结果（逐任务 pass-fail-unknown）/ 结果可信度 / 交接状态 / 回退证据——一个诚实的 JSON，未知显式标注 |
+| `actiond_handoff_pack` | **交接包**：下一个人或 Agent 接手所需的一切（envelope + payload + 自包含 Markdown） |
+| `dev_cycle_run` | **端到端开发循环**：提交 → CI → 结果（V1.0.8+；v1.3.0 起返回三态 `verification`） |
 
 > 审批卡住的任务用 CLI `actiond approve <job_id>` 或 REST `POST /api/actions/{id}/approve`（无 MCP 工具）。
 

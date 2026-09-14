@@ -412,7 +412,10 @@ ACTIOND_MCP_ALLOW_LIFECYCLE=1 actiond mcp
 | `actiond_job_cancel` | Cancel a job (validates state; terminal jobs are rejected) |
 | `actiond_job_retry` | Retry a failed job |
 | `actiond_diagnose` | **AI failure diagnosis**: root-cause analysis + classification + fix suggestions (the first tool to reach for when CI fails) |
-| `dev_cycle_run` | **End-to-end dev loop**: commit → CI → results (V1.0.8+) |
+| `actiond_cleanup` | Delete old completed/failed jobs and their artifact directories (retention window or all terminal jobs) |
+| `actiond_run_report` | **Goal run report**: what changed / why / verified or not (pass-fail-unknown per job) / how trustworthy / handoff status / rollback evidence — one honest JSON, unknowns explicit |
+| `actiond_handoff_pack` | **Handoff package**: everything the next human or agent needs to continue (envelope + payload + self-contained Markdown) |
+| `dev_cycle_run` | **End-to-end dev loop**: commit → CI → results (V1.0.8+; tri-state `verification` since v1.3.0) |
 
 > To approve a blocked job, use the CLI `actiond approve <job_id>` or REST `POST /api/actions/{id}/approve` (there is no MCP tool for this).
 
