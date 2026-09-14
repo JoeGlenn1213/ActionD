@@ -1017,6 +1017,74 @@ func containsStr(list []string, s string) bool {
 }
 
 // ---------------------------------------------------------------------------
+// registeredRepoName
+// ---------------------------------------------------------------------------
+
+func TestRegisteredRepoName(t *testing.T) {
+	writeMappings := func(t *testing.T, body string) {
+		t.Helper()
+		home := t.TempDir()
+		if err := os.MkdirAll(filepath.Join(home, ".localgithub"), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(home, ".localgithub", "mappings.yaml"), []byte(body), 0600); err != nil {
+			t.Fatal(err)
+		}
+		t.Setenv("HOME", home)
+	}
+	dir := t.TempDir()
+	body := "repos:\n  - name: registered-name\n    source_path: " + dir + "\n    bare_path: /x.git\n"
+
+	t.Run("registered name wins over basename", func(t *testing.T) {
+		writeMappings(t, body)
+		if got := registeredRepoName(dir); got != "registered-name" {
+			t.Errorf("got %q, want registered-name", got)
+		}
+	})
+
+	t.Run("unregistered path returns empty", func(t *testing.T) {
+		writeMappings(t, body)
+		if got := registeredRepoName(t.TempDir()); got != "" {
+			t.Errorf("got %q, want empty", got)
+		}
+	})
+
+	t.Run("missing mappings file returns empty", func(t *testing.T) {
+		t.Setenv("HOME", t.TempDir())
+		if got := registeredRepoName(dir); got != "" {
+			t.Errorf("got %q, want empty", got)
+		}
+	})
+
+	t.Run("symlinked path matches evaluated entry", func(t *testing.T) {
+		// lgh stores the EvalSymlinks-resolved source path; callers may pass
+		// through a symlink (or an unresolved /var-style path). Store the
+		// resolved form here exactly as lgh does.
+		real := t.TempDir()
+		resolved, err := filepath.EvalSymlinks(real)
+		if err != nil {
+			t.Skipf("eval symlinks: %v", err)
+		}
+		link := real + "-link"
+		if err := os.Symlink(real, link); err != nil {
+			t.Skip("symlink unsupported")
+		}
+		home2 := t.TempDir()
+		t.Setenv("HOME", home2)
+		if err := os.MkdirAll(filepath.Join(home2, ".localgithub"), 0700); err != nil {
+			t.Fatal(err)
+		}
+		body2 := "repos:\n  - name: via-link\n    source_path: " + resolved + "\n"
+		if err := os.WriteFile(filepath.Join(home2, ".localgithub", "mappings.yaml"), []byte(body2), 0600); err != nil {
+			t.Fatal(err)
+		}
+		if got := registeredRepoName(link); got != "via-link" {
+			t.Errorf("got %q, want via-link (evaluated match)", got)
+		}
+	})
+}
+
+// ---------------------------------------------------------------------------
 // parseEventRecord
 // ---------------------------------------------------------------------------
 

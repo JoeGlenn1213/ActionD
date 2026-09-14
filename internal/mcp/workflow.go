@@ -19,6 +19,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"gopkg.in/yaml.v3"
 )
 
 // LGHClient interface for LGH operations
@@ -311,10 +312,15 @@ func handleDevCycleRun(client ActionDClient, lghClient LGHClient, ctx context.Co
 		return mcp.NewToolResultText(string(data)), nil
 	}
 
-	// Get repo name for event log lookup
-	cmd = exec.CommandContext(ctx, "git", "-C", absPath, "rev-parse", "--show-toplevel")
-	out, _ = cmd.Output()
-	repoName := filepath.Base(strings.TrimSpace(string(out)))
+	// Get repo name for event log lookup and job association. Prefer the
+	// LGH-registered name (source_path → name): jobs and events are recorded
+	// under it, and it can differ from the directory basename.
+	repoName := registeredRepoName(absPath)
+	if repoName == "" {
+		cmd = exec.CommandContext(ctx, "git", "-C", absPath, "rev-parse", "--show-toplevel")
+		out, _ = cmd.Output()
+		repoName = filepath.Base(strings.TrimSpace(string(out)))
+	}
 
 	// Determine the commit this run pushed. lgh up waits for CI after pushing
 	// (up to ~60s), so a concurrent push during that wait can move HEAD —
@@ -723,6 +729,43 @@ func sameCommit(a, b string) bool {
 		return false
 	}
 	return strings.HasPrefix(a, b) || strings.HasPrefix(b, a)
+}
+
+// registeredRepoName resolves the LGH-registered repo name for a working
+// directory from ~/.localgithub/mappings.yaml (source_path → name). Jobs and
+// push events are recorded under the REGISTERED name, which can differ from
+// the directory basename (lgh add --name) — matching by basename alone would
+// leave such repos permanently unassociated. Returns "" when unregistered;
+// callers fall back to the basename. Both the raw and the symlink-evaluated
+// path are compared, because lgh stores the evaluated form.
+func registeredRepoName(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || path == "" {
+		return ""
+	}
+	data, err := os.ReadFile(filepath.Join(home, ".localgithub", "mappings.yaml"))
+	if err != nil {
+		return ""
+	}
+	var m struct {
+		Repos []struct {
+			Name       string `yaml:"name"`
+			SourcePath string `yaml:"source_path"`
+		} `yaml:"repos"`
+	}
+	if err := yaml.Unmarshal(data, &m); err != nil {
+		return ""
+	}
+	evaluated := path
+	if resolved, err := filepath.EvalSymlinks(path); err == nil {
+		evaluated = resolved
+	}
+	for _, r := range m.Repos {
+		if r.SourcePath == path || r.SourcePath == evaluated {
+			return r.Name
+		}
+	}
+	return ""
 }
 
 // getString gets a string argument with default
