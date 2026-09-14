@@ -409,9 +409,6 @@ func statusToVerdict(status string) string {
 // non-empty set with every job passed is pass; otherwise unknown (including
 // "no jobs at all" — silence is not a pass).
 func overallVerdict(verdicts []VerdictEntry) string {
-	if len(verdicts) == 0 {
-		return "unknown"
-	}
 	passed, failed := 0, 0
 	for _, v := range verdicts {
 		switch v.Status {
@@ -421,10 +418,21 @@ func overallVerdict(verdicts []VerdictEntry) string {
 			failed++
 		}
 	}
+	return aggregateVerdict(len(verdicts), passed, failed)
+}
+
+// aggregateVerdict is the single tri-state aggregation rule shared by every
+// caller (run report, dev_cycle_run): zero jobs is unknown — silence is not a
+// pass; any failure is fail; all passed (and at least one) is pass; anything
+// still pending/unknown keeps the aggregate unknown.
+func aggregateVerdict(total, passed, failed int) string {
+	if total == 0 {
+		return "unknown"
+	}
 	if failed > 0 {
 		return "fail"
 	}
-	if passed == len(verdicts) {
+	if passed == total {
 		return "pass"
 	}
 	return "unknown"

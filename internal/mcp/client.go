@@ -104,11 +104,8 @@ func (c *HTTPClient) GetActions(limit int) ([]ActionInfo, error) {
 			Status:     getStringVal(job, "status"),
 			CreatedAt:  getStringVal(job, "created_at"),
 			DurationMs: getInt64Val(job, "duration_ms"),
+			CommitSHA:  getStringVal(job, "commit_sha"),
 		}
-
-		// NOTE: commit_sha is present in the job payload but ActionInfo does not
-		// yet carry a CommitSHA field, so it is intentionally not mapped here.
-
 		actions = append(actions, action)
 	}
 
@@ -142,6 +139,7 @@ func (c *HTTPClient) GetActionsByEventID(eventID string) ([]ActionInfo, error) {
 			Status:     getStringVal(job, "status"),
 			CreatedAt:  getStringVal(job, "created_at"),
 			DurationMs: getInt64Val(job, "duration_ms"),
+			CommitSHA:  getStringVal(job, "commit_sha"),
 		}
 		actions = append(actions, action)
 	}

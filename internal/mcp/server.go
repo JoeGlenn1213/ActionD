@@ -66,6 +66,9 @@ type ActionInfo struct {
 	Status     string `json:"status"`
 	CreatedAt  string `json:"created_at"`
 	DurationMs int64  `json:"duration_ms"`
+	// CommitSHA is the pushed commit the job verified ("" when the server
+	// payload carries none — callers must treat that as "not associated").
+	CommitSHA string `json:"commit_sha,omitempty"`
 }
 
 // ActionDetail represents detailed action information
