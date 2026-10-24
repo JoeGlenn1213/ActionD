@@ -3,6 +3,8 @@
 **Local AI Action Execution Engine for LGH (Local Git Hub)**
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://github.com/JoeGlenn1213/ActionD)
+[![Release](https://img.shields.io/github/v/release/JoeGlenn1213/ActionD)](https://github.com/JoeGlenn1213/ActionD/releases)
+[![CI](https://github.com/JoeGlenn1213/ActionD/actions/workflows/test.yml/badge.svg)](https://github.com/JoeGlenn1213/ActionD/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![MCP Server score on Glama](https://glama.ai/mcp/servers/JoeGlenn1213/ActionD/badges/score.svg)](https://glama.ai/mcp/servers/JoeGlenn1213/ActionD)
 
