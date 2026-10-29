@@ -92,6 +92,61 @@ actiond doctor
 open http://localhost:3000
 ```
 
+## 开机自启
+
+ActionD 和 LGH 可以配置为登录时自动启动。这是可选的，不需要 root/sudo 权限。
+
+### 前置条件
+
+- **Python 3.8+** (ActionD 插件必需)
+- 通过 Homebrew 安装 `lgh` 和 `actiond`（或确保它们在 PATH 中）：
+
+```bash
+brew install JoeGlenn1213/tap/lgh
+brew install JoeGlenn1213/tap/actiond
+```
+
+### 安装自启服务
+
+```bash
+scripts/autostart.sh install
+```
+
+这会创建：
+- **macOS**: 在 `~/Library/LaunchAgents` 中创建 LaunchAgent（通过 `launchctl bootstrap` 加载）
+- **Linux**: 在 `~/.config/systemd/user` 中创建 systemd `--user` 单元（通过 `systemctl --user enable --now` 启用）
+
+安装后服务会立即启动。
+
+### 检查状态
+
+```bash
+scripts/autostart.sh status
+```
+
+显示 LGH 和 ActionD 是否已安装/已加载/正在运行。
+
+### 卸载
+
+```bash
+scripts/autostart.sh uninstall
+```
+
+停止并删除服务定义。
+
+### Linux：无需登录即可开机启动
+
+默认情况下，systemd 用户服务仅在登录时启动。如需开机（无需登录）即启动，运行：
+
+```bash
+loginctl enable-linger $USER
+```
+
+### 日志
+
+- **macOS**: `~/Library/Logs/lgh.log`, `~/Library/Logs/actiond.log`
+- **Linux**: `journalctl --user -u lgh.service` / `journalctl --user -u actiond.service`
+
 ### 默认目录与自动探测
 
 - 插件目录会按顺序自动探测：

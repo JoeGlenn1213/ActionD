@@ -61,6 +61,10 @@ func DetectDefaultWebDir() string {
 		filepath.Join(home, ".localgithub", "actiond-web", "out"),
 	}
 
+	// Also probe Homebrew share paths. These cover both Intel and Apple Silicon
+	// installations as well as Linuxbrew.
+	candidates = append(candidates, homebrewShareWebDirs()...)
+
 	for _, dir := range candidates {
 		if dir == "" {
 			continue
@@ -71,6 +75,21 @@ func DetectDefaultWebDir() string {
 	}
 
 	return ""
+}
+
+// homebrewShareWebDirs returns candidate actiond-web asset paths under known
+// Homebrew prefixes (Apple Silicon, Intel macOS, Linuxbrew).
+func homebrewShareWebDirs() []string {
+	prefixes := []string{
+		"/opt/homebrew",           // Apple Silicon
+		"/usr/local",              // Intel macOS
+		"/home/linuxbrew/.linuxbrew", // Linuxbrew
+	}
+	var dirs []string
+	for _, p := range prefixes {
+		dirs = append(dirs, filepath.Join(p, "share", "actiond-web", "out"))
+	}
+	return dirs
 }
 
 // DetectLGHSocketPath returns the default LGH socket path if it exists.

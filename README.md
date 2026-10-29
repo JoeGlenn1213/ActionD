@@ -94,6 +94,61 @@ actiond doctor
 open http://localhost:3000
 ```
 
+## Start on boot
+
+ActionD and LGH can be configured to start automatically when you log in. This is optional and does not require root/sudo.
+
+### Prerequisites
+
+- **Python 3.8+** (required for ActionD plugins)
+- `lgh` and `actiond` installed via Homebrew (or on PATH):
+
+```bash
+brew install JoeGlenn1213/tap/lgh
+brew install JoeGlenn1213/tap/actiond
+```
+
+### Install autostart services
+
+```bash
+scripts/autostart.sh install
+```
+
+This creates:
+- **macOS**: LaunchAgents in `~/Library/LaunchAgents` (loaded via `launchctl bootstrap`)
+- **Linux**: systemd `--user` units in `~/.config/systemd/user` (enabled via `systemctl --user enable --now`)
+
+Services are started immediately after installation.
+
+### Check status
+
+```bash
+scripts/autostart.sh status
+```
+
+Shows whether LGH and ActionD are installed/loaded/running.
+
+### Uninstall
+
+```bash
+scripts/autostart.sh uninstall
+```
+
+Stops and removes the service definitions.
+
+### Linux: start at boot without login
+
+By default, systemd user services only start when you log in. To have them start at boot (without logging in), run:
+
+```bash
+loginctl enable-linger $USER
+```
+
+### Logs
+
+- **macOS**: `~/Library/Logs/lgh.log`, `~/Library/Logs/actiond.log`
+- **Linux**: `journalctl --user -u lgh.service` / `journalctl --user -u actiond.service`
+
 ### Default directories and auto-detection
 
 - Plugin directories are probed in order:
