@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Discussions
+    url: https://github.com/JoeGlenn1213/ActionD/discussions
+    about: Ask questions and discuss with the community
+  - name: Security vulnerability
+    url: https://github.com/JoeGlenn1213/ActionD/security/advisories/new
+    about: Report a security issue privately (do not file a public issue)
+  - name: actiond-web (console UI)
+    url: https://github.com/JoeGlenn1213/actiond-web/issues
+    about: Issues specific to the web console
+  - name: LGH (git events)
+    url: https://github.com/JoeGlenn1213/lgh/issues
+    about: Issues in the Local Git Hub daemon that ActionD listens to

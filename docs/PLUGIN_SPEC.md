@@ -1,69 +1,158 @@
-# Actiond Plugin Specification V1
+# ActionD Plugin Specification
 
-本文档定义了 Actiond V1 插件系统的标准规范，所有新旧插件都必须遵循此规范进行实现和改造。
+[English](#1-design-principles) · [简体中文](#规范摘要中文)
 
-## 1. 插件设计原则
+Runtime contract for ActionD plugins. **Source of truth:**
 
-1. **唯一归属**：每个插件只属于一个特定的 Layer（Language / Common / Governance / Release），不重复注册。
-2. **职责分离**：上层编排关心 Capability（能力），底层执行关心 Implementation（实现）。
-3. **输出标准**：每个插件的输出必须封装为标准的 `ActionResult` 对象。
+| Artifact | Role |
+|----------|------|
+| `manifest.json` per plugin directory | Discovery & exec config (`internal/plugin/manifest.go`) |
+| `schemas/action-result.schema.json` | Preferred structured stdout |
+| `schemas/event.schema.json` | Event shapes (see also [EVENT_MODEL.md](EVENT_MODEL.md)) |
 
-## 2. 插件元数据规范 (Metadata)
+There is **no** `plugin.yaml` loader. Optional catalog-style keys (`id`, `capability`, `owner_layer`, …) may appear in manifests for humans/UI; the Go parser only **requires** the fields listed below for registration.
 
-每个插件都必须提供一个标准的元数据定义文件（例如 `plugin.yaml` 或在代码中暴露相同结构的字典），作为插件注册的凭证。
+---
 
-```yaml
-# 必备字段
-id: python-ruff                 # 插件全局唯一ID，kebab-case命名
-version: 1.0.0                  # 插件版本，遵循语义化版本
-status: enabled                 # 状态: enabled, disabled, deprecated
-owner_layer: language           # 所属层级: language, common, governance, release
-capability: lint                # 统一能力语义，用于编排层引用
-default_triggers:               # 默认监听的事件类型
-  - git.push
-inputs:                         # 插件声明需要的输入参数
-  - repo_path
-  - changed_files
-  - config_path
-outputs:                        # 插件声明会产出的输出类型
-  - normalized_result
-  - raw_log_path
+## 1. Design principles
 
-# 推荐字段
-language: python                # 适用的语言（仅当 owner_layer=language 时需要）
-implementation: ruff            # 底层使用的具体工具
-supported_profiles:             # 声明支持哪些默认的 pipeline profile
-  - fast
-  - full
-depends_on: []                  # 前置依赖的 capability 或 plugin_id
-produces_artifact: false        # 是否产生可部署产物
+1. **Discover, don’t compile-in** — ship a directory with `manifest.json`; ActionD scans plugin roots at startup/reload.  
+2. **Exec-first** — `command` + `args` spawn a process; stdin/stdout carry JSON.  
+3. **Normalize outputs** — prefer `ActionResult` so Policy Gate and MCP/AI consumers share one shape.  
+4. **Fail closed for gates** — decisions like `deny` / `rejected` force job failure even if `status` says success (see `exec_runner.go`).
+
+---
+
+## 2. Manifest (`manifest.json`)
+
+Parsed by `ParseManifest` / `Validate` in `internal/plugin/manifest.go`.
+
+### Required (validation)
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `name` | string | Unique plugin id |
+| `command` | string | Executable (e.g. `python3`) |
+| `triggers` | string[] | At least one event type, e.g. `git.push`, `git.tag` |
+
+### Used by the runtime
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `apiVersion` | string | Convention: `actiond.dev/v1` |
+| `version` | string | Plugin version (semver recommended) |
+| `description` | string | Human-readable blurb |
+| `args` | string[] | Arguments after `command` |
+| `languages` | string[] | Language filters; empty → `["*"]` |
+| `timeout` | string | Go duration, e.g. `5m`, `30s` (default 5m) |
+| `workingDir` | string | CWD relative to the manifest directory (default: that directory) |
+| `refFilter` | string | Glob for git refs, e.g. `refs/tags/*` |
+| `repoFilter` | string | Glob for repository names |
+| `supported_profiles` | string[] | `fast` / `full` / `release`; empty → all profiles |
+| `env` | object | Extra environment for the process |
+| `artifacts` | string[] | Declared artifact names (documentation / catalog) |
+
+### Optional metadata (ignored by Go struct; safe to keep)
+
+Common in-tree examples: `id`, `capability`, `owner_layer`, `maturity`, `status`, `inputs`, `outputs`. Useful for docs and future tooling; **not** what discovery validates today.
+
+### Minimal example
+
+```json
+{
+  "apiVersion": "actiond.dev/v1",
+  "name": "python-ruff",
+  "version": "1.0.0",
+  "description": "Run ruff linter for Python projects",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["python"],
+  "timeout": "3m",
+  "artifacts": ["lint-report.json"],
+  "supported_profiles": ["fast", "full"]
+}
 ```
 
-## 3. 插件生命周期
+---
 
-一个 Actiond 插件在执行时，经历以下标准生命周期：
+## 3. Process I/O
 
-1. **Initialize (初始化)**：接收上下文输入，解析元数据与配置，检查运行环境依赖（如对应的底层 CLI 工具是否已安装）。
-2. **Execute (执行)**：调用底层工具执行实际的工程动作。
-3. **Normalize (标准化)**：收集工具的原始输出（stdout/stderr/文件），并将其转换为 `ActionResult` 标准格式。
-4. **Finalize (结束)**：清理临时文件，上报最终结果给 Pipeline 引擎。
+### Stdin — `ExecInput`
 
-## 4. 标准输入 (Input)
+```json
+{
+  "event": {
+    "id": "uuid",
+    "type": "git.push",
+    "repo": "my-repo",
+    "timestamp": "2025-12-27T21:48:00Z"
+  },
+  "repo_path": "/path/to/checkout",
+  "artifact_dir": "/path/to/job/artifacts",
+  "diff": "...",
+  "files": ["a.go", "b.py"]
+}
+```
 
-插件通过标准事件上下文接收输入，详见 `EVENT_MODEL.md`。
+(`diff` / `files` may be omitted.)
 
-## 5. 标准输出 (Output)
+### Stdout — legacy shape (still supported)
 
-插件必须返回一个符合 `action-result.schema.json` 规范的对象，包含：
+```json
+{
+  "status": "success",
+  "error": "",
+  "artifacts": ["report.json"],
+  "decision": "pass",
+  "summary": "one-line summary",
+  "hints": [],
+  "duration_ms": 1200
+}
+```
 
-- **Status (状态)**：`success`, `failed`, `skipped`, `blocked`, `warning`
-- **Decision (决策)**：`pass`, `soft-pass`, `needs-review`, `deny`
-- **Summary (摘要)**：简短的执行总结和关键数据统计。
-- **Signals (信号)**：用于 Policy Gate 拦截的关键指标（如 `lint_error_count`, `coverage_delta`）。
+`status`: typically `success` or `error` (structured results also accept `failed` / `skipped` / `blocked` / `warning`).
 
-## 6. 错误处理规范
+### Stdout — ActionResult (preferred)
 
-插件内部发生错误时：
-- 不应直接崩溃退出（Panic）。
-- 应该捕获异常，并返回一个 `Status=failed` 且带有明确错误原因的 `ActionResult`。
-- `Decision` 应该根据错误的严重程度设置为 `needs-review` 或 `deny`。
+Conform to [`schemas/action-result.schema.json`](../schemas/action-result.schema.json):
+
+- **status**: `success` | `failed` | `skipped` | `blocked` | `warning`  
+- **decision**: `pass` | `soft-pass` | `needs-review` | `deny`  
+- **summary.message**, optional **signals**, **hints**, **artifacts** (`{name, path, …}`)
+
+Logs belong on **stderr**.
+
+---
+
+## 4. Lifecycle (exec)
+
+1. **Discover** — walk plugin dirs for `manifest.json`; validate; build `ExecPlugin`.  
+2. **Match** — event type ∈ `triggers`; language / ref / repo / profile filters.  
+3. **Execute** — spawn `command` + `args` with stdin JSON; enforce `timeout`.  
+4. **Normalize** — parse stdout JSON into job result / ActionResult.  
+5. **Persist** — store status, logs, artifacts under `~/.localgithub/actions/` (SQLite + files).
+
+---
+
+## 5. Errors
+
+- Catch failures in the plugin; return JSON with `status` failed/error and a clear message — do not rely on crashing.  
+- Gate-style `decision` values that deny/reject force failure (fail-closed).  
+- Non-zero process exit without valid JSON is treated as failure by the runner.
+
+---
+
+## 6. Config overrides
+
+`~/.localgithub/actions/config.json` (or `ACTIOND_CONFIG_PATH`) can enable/disable plugins, override triggers, or define ad-hoc `type: "exec"` entries without a manifest. See README Configuration.
+
+---
+
+## 规范摘要（中文）
+
+- **唯一契约**：各插件目录下的 `manifest.json`（不是 `plugin.yaml`）。  
+- **必填**：`name`、`command`、`triggers`。  
+- **推荐输出**：符合 `schemas/action-result.schema.json` 的 ActionResult；兼容旧版 `{status, artifacts}`。  
+- **日志**：stderr；**结果**：stdout 单一 JSON。  
+- 详细字段与示例以上英文章节为准，并与 `plugins/*/manifest.json`、`internal/plugin/` 保持一致。

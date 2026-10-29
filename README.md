@@ -190,15 +190,16 @@ Flags:
 
 ## Dynamic Plugin Discovery (V1.0.7+)
 
-ActionD supports adding new plugins with **zero code**. Just create a `manifest.json` in a plugin directory:
+ActionD supports adding new plugins with **zero code**. Just create a `manifest.json` in a plugin directory. Step-by-step guide: [docs/PLUGIN_GUIDE.md](docs/PLUGIN_GUIDE.md) · contract: [docs/PLUGIN_SPEC.md](docs/PLUGIN_SPEC.md) · schema: [`schemas/action-result.schema.json`](schemas/action-result.schema.json).
 
 ### Plugin directories
 
-ActionD scans plugins in this order:
+ActionD scans **existing** directories in this order (`DetectPluginDirs`):
 
-1. **System plugins**: `./plugins/` (next to the binary)
-2. **Development plugins**: `./plugins/` (current working directory)
-3. **User plugins**: `~/.localgithub/plugins/`
+1. **System plugins**: `<binary-dir>/plugins` (next to the executable)
+2. **Development plugins**: `<cwd>/plugins` (current working directory)
+3. **Legacy user path**: `~/.localgithub/actiond/plugins` (if present)
+4. **User plugins**: `~/.localgithub/plugins` (`actiond setup` materializes the builtin bundle here)
 
 ### manifest.json format
 
@@ -226,8 +227,11 @@ ActionD scans plugins in this order:
 | `args` | - | Command arguments |
 | `triggers` | ✅ | Trigger events: `git.push`, `git.tag` |
 | `languages` | - | Supported languages: `go`, `java`, `python`, `web`, `node`, `typescript`, `javascript`, `nextjs`, `*` |
-| `timeout` | - | Timeout: `5m`, `30s` |
+| `timeout` | - | Max runtime: `5m`, `30s` (default `5m`) |
 | `refFilter` | - | Ref matching: `refs/tags/*` |
+| `repoFilter` | - | Repository name glob |
+| `supported_profiles` | - | `fast` / `full` / `release` (empty = all) |
+| `workingDir` | - | CWD relative to the manifest directory |
 
 ### Creating a custom plugin
 
@@ -518,7 +522,21 @@ AI:  [calls actiond_actions_list]
 
 ## Configuration
 
-Runtime config file: `~/.localgithub/actions/config.json`
+Runtime config file: `~/.localgithub/actions/config.json` (override path with `ACTIOND_CONFIG_PATH`).
+
+### Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `ACTIOND_BIND` | `127.0.0.1:3000` | HTTP listen address. Loopback-only by default (API is unauthenticated unless token is set). Use e.g. `0.0.0.0:3000` only for deliberate LAN exposure **with** `ACTIOND_TOKEN`. |
+| `ACTIOND_TOKEN` | _(unset)_ | Optional shared secret for `/api/*`. Send `Authorization: Bearer <token>`, `X-ActionD-Token: <token>`, or `?token=` (SSE `EventSource` cannot set headers). Static console assets stay open. MCP client forwards the same env when calling the API. |
+| `ACTIOND_CORS_ORIGIN` | _(none)_ | Extra allowed browser `Origin` values (comma-separated), in addition to `http://localhost:3000\|3001` and `http://127.0.0.1:3000\|3001`. |
+| `ACTIOND_MCP_ALLOW_LIFECYCLE` | _(unset)_ | Set to `1` / `true` / `yes` to allow MCP tools that start/stop/restart the daemon. Reload-plugins does not require this. |
+| `ACTIOND_LGH_URL` | `http://localhost:9418` | LGH HTTP base URL when it is not on the default host/port. |
+| `ACTIOND_CONFIG_PATH` | `~/.localgithub/actions/config.json` | User plugin config file. |
+| `ACTIOND_ACTIONS_DIR` | `~/.localgithub/actions` | Data directory (jobs DB, logs, artifacts); mainly for tests/custom layouts. |
+
+Security model and reporting: [SECURITY.md](SECURITY.md).
 
 ### Disabling a plugin
 
@@ -657,6 +675,14 @@ go install ./cmd/actiond
 ## License
 
 MIT License — see [LICENSE](LICENSE)
+
+## Security
+
+See [SECURITY.md](SECURITY.md) for the trust model, hardening notes, and how to report vulnerabilities privately.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). Plugin authors: [docs/PLUGIN_GUIDE.md](docs/PLUGIN_GUIDE.md).
 
 ## Related Projects
 
