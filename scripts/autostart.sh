@@ -412,13 +412,15 @@ install_macos() {
     fi
 
     if [[ ${#conflicts[@]} -gt 0 ]]; then
-        echo ""
-        printf '\033[1;31m[ERROR]\033[0m Existing service files found:\n'
-        for c in "${conflicts[@]}"; do
-            echo "  - $c"
-        done
-        echo ""
-        echo "Use --force to overwrite (creates timestamped backup first)."
+        {
+            echo ""
+            printf '\033[1;31m[ERROR]\033[0m Existing service files found:\n'
+            for c in "${conflicts[@]}"; do
+                echo "  - $c"
+            done
+            echo ""
+            echo "Use --force to overwrite (creates timestamped backup first)."
+        } >&2
         exit 1
     fi
 
@@ -428,7 +430,7 @@ install_macos() {
         lgh_path="$OPT_PATH"
         actiond_path="$OPT_PATH"
     elif $FORCE; then
-        # With --force, preserve existing PATH if present
+        # With --force, preserve existing PATH if present, else use minimal
         local existing_lgh_path existing_actiond_path
         existing_lgh_path="$(extract_plist_path "$lgh_plist")"
         existing_actiond_path="$(extract_plist_path "$actiond_plist")"
@@ -620,13 +622,15 @@ install_linux() {
     fi
 
     if [[ ${#conflicts[@]} -gt 0 ]]; then
-        echo ""
-        printf '\033[1;31m[ERROR]\033[0m Existing service files found:\n'
-        for c in "${conflicts[@]}"; do
-            echo "  - $c"
-        done
-        echo ""
-        echo "Use --force to overwrite (creates timestamped backup first)."
+        {
+            echo ""
+            printf '\033[1;31m[ERROR]\033[0m Existing service files found:\n'
+            for c in "${conflicts[@]}"; do
+                echo "  - $c"
+            done
+            echo ""
+            echo "Use --force to overwrite (creates timestamped backup first)."
+        } >&2
         exit 1
     fi
 
@@ -636,6 +640,7 @@ install_linux() {
         lgh_path="$OPT_PATH"
         actiond_path="$OPT_PATH"
     elif $FORCE; then
+        # With --force, preserve existing PATH if present, else use minimal
         local existing_lgh_path existing_actiond_path
         existing_lgh_path="$(extract_unit_path "$lgh_unit")"
         existing_actiond_path="$(extract_unit_path "$actiond_unit")"

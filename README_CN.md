@@ -146,9 +146,9 @@ scripts/autostart.sh install \
   --lgh-log-dir ~/.localgithub/logs
 ```
 
-**PATH 处理**：默认计算最小化 PATH（二进制目录 + brew 前缀 + 系统路径）。使用 `--path` 显式设置。使用 `--force` 时，会保留现有 plist/unit 中的 PATH，除非指定了 `--path`。
+**PATH 处理**：默认计算最小化 PATH（二进制目录 + brew 前缀 + 系统路径）。使用 `--path` 显式设置。使用 `--force` 时，会保留现有 plist/unit 中的 PATH，除非指定了 `--path`；如果现有 plist 没有 PATH，会添加最小化 PATH。
 
-**防止崩溃循环**：服务使用 `KeepAlive/SuccessfulExit=false`（macOS）或 `Restart=on-failure`（Linux），且 `actiond start` 在已有实例运行时以 exit 0 退出。这可以防止在 ActionD 手动启动后服务管理器再次启动时的无限重启循环。
+**防止崩溃循环**：服务使用 `KeepAlive/SuccessfulExit=false`（macOS）或 `Restart=on-failure`（Linux），且 `actiond start` 在已有实例运行时以 exit 0 退出。这可以防止在 ActionD 手动启动后服务管理器再次启动时的无限重启循环。**权衡**：如果 `actiond start` 因为手动启动的实例正在运行而以 exit 0 退出，当该手动实例稍后终止时 launchd 不会重新启动 ActionD —— 运行 `launchctl kickstart gui/$UID/com.localgithub.actiond` 来重启，或者停止手动实例让 launchd 来管理。
 
 ### 检查状态
 

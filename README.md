@@ -148,9 +148,9 @@ scripts/autostart.sh install \
   --lgh-log-dir ~/.localgithub/logs
 ```
 
-**PATH handling**: By default, a minimal PATH is computed (binary dir + brew prefix + system paths). Use `--path` to set it explicitly. With `--force`, existing PATH from the current plist/unit is preserved unless `--path` is given.
+**PATH handling**: By default, a minimal PATH is computed (binary dir + brew prefix + system paths). Use `--path` to set it explicitly. With `--force`, existing PATH from the current plist/unit is preserved unless `--path` is given; if the existing plist had no PATH, a minimal one is added.
 
-**Crash loop prevention**: Services use `KeepAlive/SuccessfulExit=false` (macOS) or `Restart=on-failure` (Linux), and `actiond start` exits 0 when another instance is already running. This prevents infinite restart loops if ActionD is started manually before the service manager launches it.
+**Crash loop prevention**: Services use `KeepAlive/SuccessfulExit=false` (macOS) or `Restart=on-failure` (Linux), and `actiond start` exits 0 when another instance is already running. This prevents infinite restart loops if ActionD is started manually before the service manager launches it. **Trade-off**: if `actiond start` exits 0 because a manually-started instance was running, launchd will not relaunch ActionD if that manual instance later dies — run `launchctl kickstart gui/$UID/com.localgithub.actiond` to restart it, or stop the manual instance and let launchd manage it.
 
 ### Check status
 

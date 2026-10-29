@@ -111,6 +111,12 @@ func newStartCmd() *cobra.Command {
 		Use:     "start",
 		Aliases: []string{"serve"},
 		Short:   "Start the ActionD server",
+		Long: `Start the ActionD server in the foreground or as a background daemon.
+
+If another ActionD instance is already running (detected via PID file),
+this command prints a message and exits with code 0. This allows safe use
+under launchd (KeepAlive/SuccessfulExit=false) or systemd (Restart=on-failure)
+without causing crash loops when ActionD was started manually.`,
 		Run: func(cmd *cobra.Command, args []string) {
 			pidFile := getPidFilePath()
 
