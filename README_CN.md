@@ -98,7 +98,7 @@ ActionD 和 LGH 可以配置为登录时自动启动。这是可选的，不需�
 
 ### 前置条件
 
-- **Python 3.8+** (ActionD 插件必需)
+- **Python 3.8+** 推荐用于 ActionD 插件（缺失时会警告，核心功能仍可用）
 - 通过 Homebrew 安装 `lgh` 和 `actiond`（或确保它们在 PATH 中）：
 
 ```bash
@@ -116,7 +116,31 @@ scripts/autostart.sh install
 - **macOS**: 在 `~/Library/LaunchAgents` 中创建 LaunchAgent（通过 `launchctl bootstrap` 加载）
 - **Linux**: 在 `~/.config/systemd/user` 中创建 systemd `--user` 单元（通过 `systemctl --user enable --now` 启用）
 
-安装后服务会立即启动。
+安装后服务会立即启动。**已存在的服务文件不会被覆盖**，除非传入 `--force`。
+
+### 安装选项
+
+```bash
+scripts/autostart.sh install [选项]
+
+选项：
+  --dry-run           预览更改而不写入文件
+  --force             覆盖已存在的服务文件（会创建带时间戳的备份）
+  --lgh-bin PATH      使用指定的 lgh 二进制文件而非 PATH 查找
+  --actiond-bin PATH  使用指定的 actiond 二进制文件而非 PATH 查找
+  --log-dir DIR       日志目录（仅 macOS；默认：~/Library/Logs）
+  --env KEY=VALUE     添加环境变量（可重复使用）
+```
+
+带自定义环境变量的示例：
+
+```bash
+scripts/autostart.sh install \
+  --env ACTIOND_MCP_ALLOW_LIFECYCLE=1 \
+  --log-dir ~/.localgithub/actions
+```
+
+当前 `$PATH` 会在安装时捕获并保留在服务定义中。
 
 ### 检查状态
 
@@ -124,12 +148,12 @@ scripts/autostart.sh install
 scripts/autostart.sh status
 ```
 
-显示 LGH 和 ActionD 是否已安装/已加载/正在运行。
+显示 LGH 和 ActionD 是否已安装、配置的二进制文件路径、以及是否正在运行（包含 PID）。
 
 ### 卸载
 
 ```bash
-scripts/autostart.sh uninstall
+scripts/autostart.sh uninstall [--dry-run]
 ```
 
 停止并删除服务定义。
@@ -144,7 +168,7 @@ loginctl enable-linger $USER
 
 ### 日志
 
-- **macOS**: `~/Library/Logs/lgh.log`, `~/Library/Logs/actiond.log`
+- **macOS**: `~/Library/Logs/lgh.log`, `~/Library/Logs/actiond.log`（或自定义 `--log-dir`）
 - **Linux**: `journalctl --user -u lgh.service` / `journalctl --user -u actiond.service`
 
 ### 默认目录与自动探测

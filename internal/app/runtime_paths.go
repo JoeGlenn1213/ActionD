@@ -81,8 +81,8 @@ func DetectDefaultWebDir() string {
 // Homebrew prefixes (Apple Silicon, Intel macOS, Linuxbrew).
 func homebrewShareWebDirs() []string {
 	prefixes := []string{
-		"/opt/homebrew",           // Apple Silicon
-		"/usr/local",              // Intel macOS
+		"/opt/homebrew",              // Apple Silicon
+		"/usr/local",                 // Intel macOS
 		"/home/linuxbrew/.linuxbrew", // Linuxbrew
 	}
 	var dirs []string

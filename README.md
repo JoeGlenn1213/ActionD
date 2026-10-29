@@ -100,7 +100,7 @@ ActionD and LGH can be configured to start automatically when you log in. This i
 
 ### Prerequisites
 
-- **Python 3.8+** (required for ActionD plugins)
+- **Python 3.8+** recommended for ActionD plugins (warning if missing, core works without it)
 - `lgh` and `actiond` installed via Homebrew (or on PATH):
 
 ```bash
@@ -118,7 +118,31 @@ This creates:
 - **macOS**: LaunchAgents in `~/Library/LaunchAgents` (loaded via `launchctl bootstrap`)
 - **Linux**: systemd `--user` units in `~/.config/systemd/user` (enabled via `systemctl --user enable --now`)
 
-Services are started immediately after installation.
+Services are started immediately after installation. **Existing service files are never overwritten** unless you pass `--force`.
+
+### Install options
+
+```bash
+scripts/autostart.sh install [options]
+
+Options:
+  --dry-run           Preview changes without writing files
+  --force             Overwrite existing service files (creates timestamped backup)
+  --lgh-bin PATH      Use specified lgh binary instead of PATH lookup
+  --actiond-bin PATH  Use specified actiond binary instead of PATH lookup
+  --log-dir DIR       Log directory (macOS only; default: ~/Library/Logs)
+  --env KEY=VALUE     Add environment variable (can be repeated)
+```
+
+Example with custom environment:
+
+```bash
+scripts/autostart.sh install \
+  --env ACTIOND_MCP_ALLOW_LIFECYCLE=1 \
+  --log-dir ~/.localgithub/actions
+```
+
+The current `$PATH` is captured at install time and preserved in service definitions.
 
 ### Check status
 
@@ -126,12 +150,12 @@ Services are started immediately after installation.
 scripts/autostart.sh status
 ```
 
-Shows whether LGH and ActionD are installed/loaded/running.
+Shows whether LGH and ActionD are installed, their configured binary paths, and whether they are actually running (with PID).
 
 ### Uninstall
 
 ```bash
-scripts/autostart.sh uninstall
+scripts/autostart.sh uninstall [--dry-run]
 ```
 
 Stops and removes the service definitions.
@@ -146,7 +170,7 @@ loginctl enable-linger $USER
 
 ### Logs
 
-- **macOS**: `~/Library/Logs/lgh.log`, `~/Library/Logs/actiond.log`
+- **macOS**: `~/Library/Logs/lgh.log`, `~/Library/Logs/actiond.log` (or custom `--log-dir`)
 - **Linux**: `journalctl --user -u lgh.service` / `journalctl --user -u actiond.service`
 
 ### Default directories and auto-detection
