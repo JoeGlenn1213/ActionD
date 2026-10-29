@@ -118,7 +118,7 @@ This creates:
 - **macOS**: LaunchAgents in `~/Library/LaunchAgents` (loaded via `launchctl bootstrap`)
 - **Linux**: systemd `--user` units in `~/.config/systemd/user` (enabled via `systemctl --user enable --now`)
 
-Services are started immediately after installation. **Existing service files are never overwritten** unless you pass `--force`.
+Services are started immediately after installation. **Existing service files are never overwritten** unless you pass `--force` (which creates a timestamped backup first).
 
 ### Install options
 
@@ -126,23 +126,31 @@ Services are started immediately after installation. **Existing service files ar
 scripts/autostart.sh install [options]
 
 Options:
-  --dry-run           Preview changes without writing files
-  --force             Overwrite existing service files (creates timestamped backup)
-  --lgh-bin PATH      Use specified lgh binary instead of PATH lookup
-  --actiond-bin PATH  Use specified actiond binary instead of PATH lookup
-  --log-dir DIR       Log directory (macOS only; default: ~/Library/Logs)
-  --env KEY=VALUE     Add environment variable (can be repeated)
+  --dry-run              Preview changes without writing files
+  --force                Overwrite existing service files (backs up first)
+  --lgh-bin PATH         Use specified lgh binary instead of PATH lookup
+  --actiond-bin PATH     Use specified actiond binary instead of PATH lookup
+  --path PATH            Set PATH for both services (colon-separated)
+  --lgh-log-dir DIR      LGH log directory (macOS; default: ~/Library/Logs)
+  --actiond-log-dir DIR  ActionD log directory (macOS; default: ~/Library/Logs)
+  --log-dir DIR          Log directory for both services (macOS shorthand)
+  --lgh-env KEY=VALUE    Add environment variable for LGH only (can be repeated)
+  --actiond-env KEY=VAL  Add environment variable for ActionD only (can be repeated)
+  --env KEY=VALUE        Add environment variable for both services (can be repeated)
 ```
 
-Example with custom environment:
+Example with per-service environment:
 
 ```bash
 scripts/autostart.sh install \
-  --env ACTIOND_MCP_ALLOW_LIFECYCLE=1 \
-  --log-dir ~/.localgithub/actions
+  --actiond-env ACTIOND_MCP_ALLOW_LIFECYCLE=1 \
+  --actiond-log-dir ~/.localgithub/actions \
+  --lgh-log-dir ~/.localgithub/logs
 ```
 
-The current `$PATH` is captured at install time and preserved in service definitions.
+**PATH handling**: By default, a minimal PATH is computed (binary dir + brew prefix + system paths). Use `--path` to set it explicitly. With `--force`, existing PATH from the current plist/unit is preserved unless `--path` is given.
+
+**Crash loop prevention**: Services use `KeepAlive/SuccessfulExit=false` (macOS) or `Restart=on-failure` (Linux), and `actiond start` exits 0 when another instance is already running. This prevents infinite restart loops if ActionD is started manually before the service manager launches it.
 
 ### Check status
 
@@ -150,7 +158,7 @@ The current `$PATH` is captured at install time and preserved in service definit
 scripts/autostart.sh status
 ```
 
-Shows whether LGH and ActionD are installed, their configured binary paths, and whether they are actually running (with PID).
+Shows whether LGH and ActionD are loaded (not just file exists), their configured binary paths, and whether they are actually running (with PID).
 
 ### Uninstall
 
@@ -170,7 +178,7 @@ loginctl enable-linger $USER
 
 ### Logs
 
-- **macOS**: `~/Library/Logs/lgh.log`, `~/Library/Logs/actiond.log` (or custom `--log-dir`)
+- **macOS**: `<log-dir>/lgh.launchd.out`, `<log-dir>/lgh.launchd.err`, `<log-dir>/actiond.launchd.out`, `<log-dir>/actiond.launchd.err`
 - **Linux**: `journalctl --user -u lgh.service` / `journalctl --user -u actiond.service`
 
 ### Default directories and auto-detection

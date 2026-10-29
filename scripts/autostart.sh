@@ -30,8 +30,11 @@ DRY_RUN=false
 FORCE=false
 OPT_LGH_BIN=""
 OPT_ACTIOND_BIN=""
-OPT_LOG_DIR=""
-declare -a EXTRA_ENV=()
+OPT_PATH=""
+OPT_LGH_LOG_DIR=""
+OPT_ACTIOND_LOG_DIR=""
+declare -a OPT_LGH_ENV=()
+declare -a OPT_ACTIOND_ENV=()
 
 #------------------------------------------------------------------------------
 # Helpers
@@ -57,6 +60,65 @@ resolve_bin() {
         fi
     fi
     echo "$path"
+}
+
+# Build a minimal sane PATH for a binary
+build_minimal_path() {
+    local bin_path="$1"
+    local parts=()
+    local seen=()
+    
+    add_if_new() {
+        local p="$1"
+        [[ -d "$p" ]] || return 0
+        for s in "${seen[@]+"${seen[@]}"}"; do
+            [[ "$s" == "$p" ]] && return 0
+        done
+        seen+=("$p")
+        parts+=("$p")
+    }
+    
+    # 1. Directory of the chosen binary
+    if [[ -n "$bin_path" ]]; then
+        add_if_new "$(dirname "$bin_path")"
+    fi
+    
+    # 2. Homebrew prefix bin (detect from brew or common locations)
+    if command -v brew &>/dev/null; then
+        add_if_new "$(brew --prefix 2>/dev/null)/bin"
+    elif [[ -d /opt/homebrew/bin ]]; then
+        add_if_new /opt/homebrew/bin
+    elif [[ -d /usr/local/bin ]]; then
+        add_if_new /usr/local/bin
+    elif [[ -d /home/linuxbrew/.linuxbrew/bin ]]; then
+        add_if_new /home/linuxbrew/.linuxbrew/bin
+    fi
+    
+    # 3. Standard system paths
+    add_if_new /usr/bin
+    add_if_new /bin
+    add_if_new /usr/sbin
+    add_if_new /sbin
+    
+    # Join with colons
+    local IFS=':'
+    echo "${parts[*]}"
+}
+
+# Extract PATH from existing plist
+extract_plist_path() {
+    local plist="$1"
+    if [[ -f "$plist" ]]; then
+        /usr/libexec/PlistBuddy -c "Print :EnvironmentVariables:PATH" "$plist" 2>/dev/null || true
+    fi
+}
+
+# Extract PATH from existing systemd unit
+extract_unit_path() {
+    local unit="$1"
+    if [[ -f "$unit" ]]; then
+        grep -E '^Environment=PATH=' "$unit" 2>/dev/null | sed 's/^Environment=PATH=//' || true
+    fi
 }
 
 check_python() {
@@ -89,6 +151,17 @@ backup_file() {
     fi
 }
 
+# XML-escape a string for plist values
+xml_escape() {
+    local s="$1"
+    s="${s//&/&amp;}"
+    s="${s//</&lt;}"
+    s="${s//>/&gt;}"
+    s="${s//\"/&quot;}"
+    s="${s//\'/&apos;}"
+    echo "$s"
+}
+
 # Extract binary path from existing plist (macOS)
 extract_plist_bin() {
     local plist="$1"
@@ -105,11 +178,16 @@ extract_unit_bin() {
     fi
 }
 
+# Check if launchd job is loaded (macOS)
+is_launchd_loaded() {
+    local label="$1"
+    launchctl list 2>/dev/null | awk -v label="$label" '$3 == label {found=1} END {exit !found}'
+}
+
 # Get PID from launchctl (macOS)
 get_launchctl_pid() {
     local label="$1"
     local pid
-    # Try launchctl list first (shows PID or '-' if not running)
     pid=$(launchctl list 2>/dev/null | awk -v label="$label" '$3 == label {print $1}')
     if [[ "$pid" == "-" || -z "$pid" ]]; then
         echo ""
@@ -129,8 +207,15 @@ is_systemd_active() {
 #------------------------------------------------------------------------------
 generate_lgh_plist() {
     local bin_path="$1"
-    local log_dir="$2"
-    local current_path="${PATH:-/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin}"
+    local svc_path="$2"
+    local log_dir="$3"
+    shift 3
+    local -a env_vars=("$@")
+    
+    local escaped_bin escaped_path escaped_log_dir
+    escaped_bin="$(xml_escape "$bin_path")"
+    escaped_path="$(xml_escape "$svc_path")"
+    escaped_log_dir="$(xml_escape "$log_dir")"
     
     cat <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -141,29 +226,31 @@ generate_lgh_plist() {
     <string>${LGH_PLIST_LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${bin_path}</string>
+        <string>${escaped_bin}</string>
         <string>serve</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <true/>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
     <key>StandardOutPath</key>
-    <string>${log_dir}/lgh.log</string>
+    <string>${escaped_log_dir}/lgh.launchd.out</string>
     <key>StandardErrorPath</key>
-    <string>${log_dir}/lgh.log</string>
+    <string>${escaped_log_dir}/lgh.launchd.err</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>${current_path}</string>
+        <string>${escaped_path}</string>
 EOF
-    # Add extra environment variables
-    for env_pair in "${EXTRA_ENV[@]}"; do
+    for env_pair in "${env_vars[@]+"${env_vars[@]}"}"; do
         local key="${env_pair%%=*}"
         local val="${env_pair#*=}"
         cat <<EOF
-        <key>${key}</key>
-        <string>${val}</string>
+        <key>$(xml_escape "$key")</key>
+        <string>$(xml_escape "$val")</string>
 EOF
     done
     cat <<EOF
@@ -175,8 +262,15 @@ EOF
 
 generate_actiond_plist() {
     local bin_path="$1"
-    local log_dir="$2"
-    local current_path="${PATH:-/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin}"
+    local svc_path="$2"
+    local log_dir="$3"
+    shift 3
+    local -a env_vars=("$@")
+    
+    local escaped_bin escaped_path escaped_log_dir
+    escaped_bin="$(xml_escape "$bin_path")"
+    escaped_path="$(xml_escape "$svc_path")"
+    escaped_log_dir="$(xml_escape "$log_dir")"
     
     cat <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -187,29 +281,31 @@ generate_actiond_plist() {
     <string>${ACTIOND_PLIST_LABEL}</string>
     <key>ProgramArguments</key>
     <array>
-        <string>${bin_path}</string>
+        <string>${escaped_bin}</string>
         <string>start</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
-    <true/>
+    <dict>
+        <key>SuccessfulExit</key>
+        <false/>
+    </dict>
     <key>StandardOutPath</key>
-    <string>${log_dir}/actiond.log</string>
+    <string>${escaped_log_dir}/actiond.launchd.out</string>
     <key>StandardErrorPath</key>
-    <string>${log_dir}/actiond.log</string>
+    <string>${escaped_log_dir}/actiond.launchd.err</string>
     <key>EnvironmentVariables</key>
     <dict>
         <key>PATH</key>
-        <string>${current_path}</string>
+        <string>${escaped_path}</string>
 EOF
-    # Add extra environment variables
-    for env_pair in "${EXTRA_ENV[@]}"; do
+    for env_pair in "${env_vars[@]+"${env_vars[@]}"}"; do
         local key="${env_pair%%=*}"
         local val="${env_pair#*=}"
         cat <<EOF
-        <key>${key}</key>
-        <string>${val}</string>
+        <key>$(xml_escape "$key")</key>
+        <string>$(xml_escape "$val")</string>
 EOF
     done
     cat <<EOF
@@ -224,6 +320,10 @@ EOF
 #------------------------------------------------------------------------------
 generate_lgh_unit() {
     local bin_path="$1"
+    local svc_path="$2"
+    shift 2
+    local -a env_vars=("$@")
+    
     cat <<EOF
 [Unit]
 Description=LGH - Local Git Hub server
@@ -234,9 +334,9 @@ Type=simple
 ExecStart=${bin_path} serve
 Restart=on-failure
 RestartSec=5
+Environment=PATH=${svc_path}
 EOF
-    # Add extra environment variables
-    for env_pair in "${EXTRA_ENV[@]}"; do
+    for env_pair in "${env_vars[@]+"${env_vars[@]}"}"; do
         echo "Environment=${env_pair}"
     done
     cat <<EOF
@@ -248,6 +348,10 @@ EOF
 
 generate_actiond_unit() {
     local bin_path="$1"
+    local svc_path="$2"
+    shift 2
+    local -a env_vars=("$@")
+    
     cat <<EOF
 [Unit]
 Description=ActionD - Local AI Action Execution Engine
@@ -259,9 +363,9 @@ Type=simple
 ExecStart=${bin_path} start
 Restart=on-failure
 RestartSec=5
+Environment=PATH=${svc_path}
 EOF
-    # Add extra environment variables
-    for env_pair in "${EXTRA_ENV[@]}"; do
+    for env_pair in "${env_vars[@]+"${env_vars[@]}"}"; do
         echo "Environment=${env_pair}"
     done
     cat <<EOF
@@ -275,11 +379,7 @@ EOF
 # macOS install/uninstall/status
 #------------------------------------------------------------------------------
 install_macos() {
-    local log_dir="${OPT_LOG_DIR:-${HOME}/Library/Logs}"
-    
     info "Installing LaunchAgents for macOS..."
-    info "Log directory: $log_dir"
-    info "Current PATH will be preserved in service definitions"
 
     local lgh_bin actiond_bin lgh_plist actiond_plist
     lgh_plist="${LAUNCHAGENT_DIR}/${LGH_PLIST_LABEL}.plist"
@@ -298,28 +398,59 @@ install_macos() {
         actiond_bin="$(resolve_bin actiond)"
     fi
 
-    # Check for existing plists
+    # Check for existing plists and collect all conflicts
+    local conflicts=()
     local existing_lgh_bin existing_actiond_bin
     existing_lgh_bin="$(extract_plist_bin "$lgh_plist")"
     existing_actiond_bin="$(extract_plist_bin "$actiond_plist")"
 
     if [[ -f "$lgh_plist" ]] && ! $FORCE; then
-        error "LGH plist already exists: $lgh_plist
-  Current binary: ${existing_lgh_bin:-unknown}
-  Use --force to overwrite (will backup existing file first)
-  Or use --lgh-bin to specify a different binary path"
+        conflicts+=("LGH plist exists: $lgh_plist (binary: ${existing_lgh_bin:-unknown})")
+    fi
+    if [[ -f "$actiond_plist" ]] && ! $FORCE; then
+        conflicts+=("ActionD plist exists: $actiond_plist (binary: ${existing_actiond_bin:-unknown})")
     fi
 
-    if [[ -f "$actiond_plist" ]] && ! $FORCE; then
-        error "ActionD plist already exists: $actiond_plist
-  Current binary: ${existing_actiond_bin:-unknown}
-  Use --force to overwrite (will backup existing file first)
-  Or use --actiond-bin to specify a different binary path"
+    if [[ ${#conflicts[@]} -gt 0 ]]; then
+        echo ""
+        printf '\033[1;31m[ERROR]\033[0m Existing service files found:\n'
+        for c in "${conflicts[@]}"; do
+            echo "  - $c"
+        done
+        echo ""
+        echo "Use --force to overwrite (creates timestamped backup first)."
+        exit 1
     fi
+
+    # Determine PATH for each service
+    local lgh_path actiond_path
+    if [[ -n "$OPT_PATH" ]]; then
+        lgh_path="$OPT_PATH"
+        actiond_path="$OPT_PATH"
+    elif $FORCE; then
+        # With --force, preserve existing PATH if present
+        local existing_lgh_path existing_actiond_path
+        existing_lgh_path="$(extract_plist_path "$lgh_plist")"
+        existing_actiond_path="$(extract_plist_path "$actiond_plist")"
+        lgh_path="${existing_lgh_path:-$(build_minimal_path "$lgh_bin")}"
+        actiond_path="${existing_actiond_path:-$(build_minimal_path "$actiond_bin")}"
+    else
+        lgh_path="$(build_minimal_path "$lgh_bin")"
+        actiond_path="$(build_minimal_path "$actiond_bin")"
+    fi
+
+    # Determine log directories
+    local lgh_log_dir="${OPT_LGH_LOG_DIR:-${HOME}/Library/Logs}"
+    local actiond_log_dir="${OPT_ACTIOND_LOG_DIR:-${HOME}/Library/Logs}"
+
+    info "LGH log directory: $lgh_log_dir"
+    info "ActionD log directory: $actiond_log_dir"
+    info "LGH PATH: $lgh_path"
+    info "ActionD PATH: $actiond_path"
 
     # Create directories (only if not dry-run)
     if ! $DRY_RUN; then
-        mkdir -p "$LAUNCHAGENT_DIR" "$log_dir"
+        mkdir -p "$LAUNCHAGENT_DIR" "$lgh_log_dir" "$actiond_log_dir"
     fi
 
     # LGH
@@ -331,10 +462,10 @@ install_macos() {
         if $DRY_RUN; then
             info "[dry-run] Would write: $lgh_plist"
             echo "--- Generated plist content ---"
-            generate_lgh_plist "$lgh_bin" "$log_dir"
+            generate_lgh_plist "$lgh_bin" "$lgh_path" "$lgh_log_dir" "${OPT_LGH_ENV[@]+"${OPT_LGH_ENV[@]}"}"
             echo "--- End plist content ---"
         else
-            generate_lgh_plist "$lgh_bin" "$log_dir" > "$lgh_plist"
+            generate_lgh_plist "$lgh_bin" "$lgh_path" "$lgh_log_dir" "${OPT_LGH_ENV[@]+"${OPT_LGH_ENV[@]}"}" > "$lgh_plist"
             launchctl bootout "gui/$(id -u)/${LGH_PLIST_LABEL}" 2>/dev/null || true
             launchctl bootstrap "gui/$(id -u)" "$lgh_plist"
             success "LGH LaunchAgent installed and loaded"
@@ -353,10 +484,10 @@ install_macos() {
         if $DRY_RUN; then
             info "[dry-run] Would write: $actiond_plist"
             echo "--- Generated plist content ---"
-            generate_actiond_plist "$actiond_bin" "$log_dir"
+            generate_actiond_plist "$actiond_bin" "$actiond_path" "$actiond_log_dir" "${OPT_ACTIOND_ENV[@]+"${OPT_ACTIOND_ENV[@]}"}"
             echo "--- End plist content ---"
         else
-            generate_actiond_plist "$actiond_bin" "$log_dir" > "$actiond_plist"
+            generate_actiond_plist "$actiond_bin" "$actiond_path" "$actiond_log_dir" "${OPT_ACTIOND_ENV[@]+"${OPT_ACTIOND_ENV[@]}"}" > "$actiond_plist"
             launchctl bootout "gui/$(id -u)/${ACTIOND_PLIST_LABEL}" 2>/dev/null || true
             launchctl bootstrap "gui/$(id -u)" "$actiond_plist"
             success "ActionD LaunchAgent installed and loaded"
@@ -406,10 +537,10 @@ status_macos() {
 
     echo ""
     echo "LGH:"
-    if [[ -f "$lgh_plist" ]]; then
+    if is_launchd_loaded "$LGH_PLIST_LABEL"; then
         local lgh_bin pid
         lgh_bin="$(extract_plist_bin "$lgh_plist")"
-        echo "  Plist:  $lgh_plist"
+        echo "  Plist:  ${lgh_plist}${lgh_plist:+ (file exists: }$( [[ -f "$lgh_plist" ]] && echo "yes" || echo "no" ))"
         echo "  Binary: ${lgh_bin:-unknown}"
         pid="$(get_launchctl_pid "$LGH_PLIST_LABEL")"
         if [[ -n "$pid" ]]; then
@@ -417,16 +548,22 @@ status_macos() {
         else
             echo "  Status: loaded but not running"
         fi
+    elif [[ -f "$lgh_plist" ]]; then
+        local lgh_bin
+        lgh_bin="$(extract_plist_bin "$lgh_plist")"
+        echo "  Plist:  $lgh_plist"
+        echo "  Binary: ${lgh_bin:-unknown}"
+        echo "  Status: plist exists but not loaded"
     else
         echo "  Status: not installed"
     fi
 
     echo ""
     echo "ActionD:"
-    if [[ -f "$actiond_plist" ]]; then
+    if is_launchd_loaded "$ACTIOND_PLIST_LABEL"; then
         local actiond_bin pid
         actiond_bin="$(extract_plist_bin "$actiond_plist")"
-        echo "  Plist:  $actiond_plist"
+        echo "  Plist:  ${actiond_plist}${actiond_plist:+ (file exists: }$( [[ -f "$actiond_plist" ]] && echo "yes" || echo "no" ))"
         echo "  Binary: ${actiond_bin:-unknown}"
         pid="$(get_launchctl_pid "$ACTIOND_PLIST_LABEL")"
         if [[ -n "$pid" ]]; then
@@ -434,6 +571,12 @@ status_macos() {
         else
             echo "  Status: loaded but not running"
         fi
+    elif [[ -f "$actiond_plist" ]]; then
+        local actiond_bin
+        actiond_bin="$(extract_plist_bin "$actiond_plist")"
+        echo "  Plist:  $actiond_plist"
+        echo "  Binary: ${actiond_bin:-unknown}"
+        echo "  Status: plist exists but not loaded"
     else
         echo "  Status: not installed"
     fi
@@ -463,24 +606,48 @@ install_linux() {
         actiond_bin="$(resolve_bin actiond)"
     fi
 
-    # Check for existing units
+    # Check for existing units and collect all conflicts
+    local conflicts=()
     local existing_lgh_bin existing_actiond_bin
     existing_lgh_bin="$(extract_unit_bin "$lgh_unit")"
     existing_actiond_bin="$(extract_unit_bin "$actiond_unit")"
 
     if [[ -f "$lgh_unit" ]] && ! $FORCE; then
-        error "LGH unit already exists: $lgh_unit
-  Current binary: ${existing_lgh_bin:-unknown}
-  Use --force to overwrite (will backup existing file first)
-  Or use --lgh-bin to specify a different binary path"
+        conflicts+=("LGH unit exists: $lgh_unit (binary: ${existing_lgh_bin:-unknown})")
+    fi
+    if [[ -f "$actiond_unit" ]] && ! $FORCE; then
+        conflicts+=("ActionD unit exists: $actiond_unit (binary: ${existing_actiond_bin:-unknown})")
     fi
 
-    if [[ -f "$actiond_unit" ]] && ! $FORCE; then
-        error "ActionD unit already exists: $actiond_unit
-  Current binary: ${existing_actiond_bin:-unknown}
-  Use --force to overwrite (will backup existing file first)
-  Or use --actiond-bin to specify a different binary path"
+    if [[ ${#conflicts[@]} -gt 0 ]]; then
+        echo ""
+        printf '\033[1;31m[ERROR]\033[0m Existing service files found:\n'
+        for c in "${conflicts[@]}"; do
+            echo "  - $c"
+        done
+        echo ""
+        echo "Use --force to overwrite (creates timestamped backup first)."
+        exit 1
     fi
+
+    # Determine PATH for each service
+    local lgh_path actiond_path
+    if [[ -n "$OPT_PATH" ]]; then
+        lgh_path="$OPT_PATH"
+        actiond_path="$OPT_PATH"
+    elif $FORCE; then
+        local existing_lgh_path existing_actiond_path
+        existing_lgh_path="$(extract_unit_path "$lgh_unit")"
+        existing_actiond_path="$(extract_unit_path "$actiond_unit")"
+        lgh_path="${existing_lgh_path:-$(build_minimal_path "$lgh_bin")}"
+        actiond_path="${existing_actiond_path:-$(build_minimal_path "$actiond_bin")}"
+    else
+        lgh_path="$(build_minimal_path "$lgh_bin")"
+        actiond_path="$(build_minimal_path "$actiond_bin")"
+    fi
+
+    info "LGH PATH: $lgh_path"
+    info "ActionD PATH: $actiond_path"
 
     # Create directory (only if not dry-run)
     if ! $DRY_RUN; then
@@ -496,10 +663,10 @@ install_linux() {
         if $DRY_RUN; then
             info "[dry-run] Would write: $lgh_unit"
             echo "--- Generated unit content ---"
-            generate_lgh_unit "$lgh_bin"
+            generate_lgh_unit "$lgh_bin" "$lgh_path" "${OPT_LGH_ENV[@]+"${OPT_LGH_ENV[@]}"}"
             echo "--- End unit content ---"
         else
-            generate_lgh_unit "$lgh_bin" > "$lgh_unit"
+            generate_lgh_unit "$lgh_bin" "$lgh_path" "${OPT_LGH_ENV[@]+"${OPT_LGH_ENV[@]}"}" > "$lgh_unit"
             systemctl --user daemon-reload
             systemctl --user enable --now "$LGH_SERVICE"
             success "LGH systemd unit installed and enabled"
@@ -518,10 +685,10 @@ install_linux() {
         if $DRY_RUN; then
             info "[dry-run] Would write: $actiond_unit"
             echo "--- Generated unit content ---"
-            generate_actiond_unit "$actiond_bin"
+            generate_actiond_unit "$actiond_bin" "$actiond_path" "${OPT_ACTIOND_ENV[@]+"${OPT_ACTIOND_ENV[@]}"}"
             echo "--- End unit content ---"
         else
-            generate_actiond_unit "$actiond_bin" > "$actiond_unit"
+            generate_actiond_unit "$actiond_bin" "$actiond_path" "${OPT_ACTIOND_ENV[@]+"${OPT_ACTIOND_ENV[@]}"}" > "$actiond_unit"
             systemctl --user daemon-reload
             systemctl --user enable --now "$ACTIOND_SERVICE"
             success "ActionD systemd unit installed and enabled"
@@ -641,21 +808,36 @@ Commands:
   status      Show current service status
 
 Install Options:
-  --dry-run           Show what would be done without making changes
-  --force             Overwrite existing service files (backs up first)
-  --lgh-bin PATH      Use specified lgh binary instead of PATH lookup
-  --actiond-bin PATH  Use specified actiond binary instead of PATH lookup
-  --log-dir DIR       Log directory (macOS only; default: ~/Library/Logs)
-  --env KEY=VALUE     Add environment variable (can be repeated)
+  --dry-run              Show what would be done without making changes
+  --force                Overwrite existing service files (backs up first)
+  --lgh-bin PATH         Use specified lgh binary instead of PATH lookup
+  --actiond-bin PATH     Use specified actiond binary instead of PATH lookup
+  --path PATH            Set PATH for both services (colon-separated)
+  --lgh-log-dir DIR      LGH log directory (macOS; default: ~/Library/Logs)
+  --actiond-log-dir DIR  ActionD log directory (macOS; default: ~/Library/Logs)
+  --lgh-env KEY=VALUE    Add environment variable for LGH (can be repeated)
+  --actiond-env KEY=VAL  Add environment variable for ActionD (can be repeated)
+  --env KEY=VALUE        Add environment variable for both services (can be repeated)
+  --log-dir DIR          Log directory for both services (macOS; shorthand)
 
 Uninstall Options:
-  --dry-run           Show what would be done without making changes
+  --dry-run              Show what would be done without making changes
 
 On macOS: creates user LaunchAgents in ~/Library/LaunchAgents
 On Linux: creates systemd --user units in ~/.config/systemd/user
 
-The current PATH is captured at install time and preserved in service definitions.
-Existing service files are never overwritten without --force.
+PATH handling:
+  By default, a minimal PATH is computed: binary dir + brew prefix + system paths.
+  Use --path to set an explicit PATH for both services.
+  With --force, existing PATH from current plist/unit is preserved unless --path given.
+
+Log files (macOS):
+  stdout: <log-dir>/<service>.launchd.out
+  stderr: <log-dir>/<service>.launchd.err
+
+Restart behavior:
+  Services use KeepAlive/SuccessfulExit=false (macOS) or Restart=on-failure (Linux).
+  This prevents crash loops when another instance is already running.
 
 Prerequisites:
   - Python 3.8+ recommended for ActionD plugins (warning if missing)
@@ -689,15 +871,44 @@ main() {
                 OPT_ACTIOND_BIN="$2"
                 shift 2
                 ;;
+            --path)
+                [[ $# -ge 2 ]] || error "--path requires a PATH argument"
+                OPT_PATH="$2"
+                shift 2
+                ;;
+            --lgh-log-dir)
+                [[ $# -ge 2 ]] || error "--lgh-log-dir requires a path argument"
+                OPT_LGH_LOG_DIR="$2"
+                shift 2
+                ;;
+            --actiond-log-dir)
+                [[ $# -ge 2 ]] || error "--actiond-log-dir requires a path argument"
+                OPT_ACTIOND_LOG_DIR="$2"
+                shift 2
+                ;;
             --log-dir)
                 [[ $# -ge 2 ]] || error "--log-dir requires a path argument"
-                OPT_LOG_DIR="$2"
+                OPT_LGH_LOG_DIR="$2"
+                OPT_ACTIOND_LOG_DIR="$2"
+                shift 2
+                ;;
+            --lgh-env)
+                [[ $# -ge 2 ]] || error "--lgh-env requires a KEY=VALUE argument"
+                [[ "$2" == *"="* ]] || error "--lgh-env argument must be KEY=VALUE format"
+                OPT_LGH_ENV+=("$2")
+                shift 2
+                ;;
+            --actiond-env)
+                [[ $# -ge 2 ]] || error "--actiond-env requires a KEY=VALUE argument"
+                [[ "$2" == *"="* ]] || error "--actiond-env argument must be KEY=VALUE format"
+                OPT_ACTIOND_ENV+=("$2")
                 shift 2
                 ;;
             --env)
                 [[ $# -ge 2 ]] || error "--env requires a KEY=VALUE argument"
                 [[ "$2" == *"="* ]] || error "--env argument must be KEY=VALUE format"
-                EXTRA_ENV+=("$2")
+                OPT_LGH_ENV+=("$2")
+                OPT_ACTIOND_ENV+=("$2")
                 shift 2
                 ;;
             -*)

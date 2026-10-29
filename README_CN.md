@@ -116,7 +116,7 @@ scripts/autostart.sh install
 - **macOS**: 在 `~/Library/LaunchAgents` 中创建 LaunchAgent（通过 `launchctl bootstrap` 加载）
 - **Linux**: 在 `~/.config/systemd/user` 中创建 systemd `--user` 单元（通过 `systemctl --user enable --now` 启用）
 
-安装后服务会立即启动。**已存在的服务文件不会被覆盖**，除非传入 `--force`。
+安装后服务会立即启动。**已存在的服务文件不会被覆盖**，除非传入 `--force`（会先创建带时间戳的备份）。
 
 ### 安装选项
 
@@ -124,23 +124,31 @@ scripts/autostart.sh install
 scripts/autostart.sh install [选项]
 
 选项：
-  --dry-run           预览更改而不写入文件
-  --force             覆盖已存在的服务文件（会创建带时间戳的备份）
-  --lgh-bin PATH      使用指定的 lgh 二进制文件而非 PATH 查找
-  --actiond-bin PATH  使用指定的 actiond 二进制文件而非 PATH 查找
-  --log-dir DIR       日志目录（仅 macOS；默认：~/Library/Logs）
-  --env KEY=VALUE     添加环境变量（可重复使用）
+  --dry-run              预览更改而不写入文件
+  --force                覆盖已存在的服务文件（会先备份）
+  --lgh-bin PATH         使用指定的 lgh 二进制文件而非 PATH 查找
+  --actiond-bin PATH     使用指定的 actiond 二进制文件而非 PATH 查找
+  --path PATH            设置两个服务的 PATH（冒号分隔）
+  --lgh-log-dir DIR      LGH 日志目录（macOS；默认：~/Library/Logs）
+  --actiond-log-dir DIR  ActionD 日志目录（macOS；默认：~/Library/Logs）
+  --log-dir DIR          两个服务的日志目录（macOS 简写）
+  --lgh-env KEY=VALUE    仅为 LGH 添加环境变量（可重复使用）
+  --actiond-env KEY=VAL  仅为 ActionD 添加环境变量（可重复使用）
+  --env KEY=VALUE        为两个服务添加环境变量（可重复使用）
 ```
 
-带自定义环境变量的示例：
+带分服务环境变量的示例：
 
 ```bash
 scripts/autostart.sh install \
-  --env ACTIOND_MCP_ALLOW_LIFECYCLE=1 \
-  --log-dir ~/.localgithub/actions
+  --actiond-env ACTIOND_MCP_ALLOW_LIFECYCLE=1 \
+  --actiond-log-dir ~/.localgithub/actions \
+  --lgh-log-dir ~/.localgithub/logs
 ```
 
-当前 `$PATH` 会在安装时捕获并保留在服务定义中。
+**PATH 处理**：默认计算最小化 PATH（二进制目录 + brew 前缀 + 系统路径）。使用 `--path` 显式设置。使用 `--force` 时，会保留现有 plist/unit 中的 PATH，除非指定了 `--path`。
+
+**防止崩溃循环**：服务使用 `KeepAlive/SuccessfulExit=false`（macOS）或 `Restart=on-failure`（Linux），且 `actiond start` 在已有实例运行时以 exit 0 退出。这可以防止在 ActionD 手动启动后服务管理器再次启动时的无限重启循环。
 
 ### 检查状态
 
@@ -148,7 +156,7 @@ scripts/autostart.sh install \
 scripts/autostart.sh status
 ```
 
-显示 LGH 和 ActionD 是否已安装、配置的二进制文件路径、以及是否正在运行（包含 PID）。
+显示 LGH 和 ActionD 是否已加载（不仅是文件存在）、配置的二进制文件路径、以及是否正在运行（包含 PID）。
 
 ### 卸载
 
@@ -168,7 +176,7 @@ loginctl enable-linger $USER
 
 ### 日志
 
-- **macOS**: `~/Library/Logs/lgh.log`, `~/Library/Logs/actiond.log`（或自定义 `--log-dir`）
+- **macOS**: `<log-dir>/lgh.launchd.out`, `<log-dir>/lgh.launchd.err`, `<log-dir>/actiond.launchd.out`, `<log-dir>/actiond.launchd.err`
 - **Linux**: `journalctl --user -u lgh.service` / `journalctl --user -u actiond.service`
 
 ### 默认目录与自动探测

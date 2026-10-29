@@ -118,8 +118,11 @@ func newStartCmd() *cobra.Command {
 			if isRunning(pidFile) {
 				pid := readPid(pidFile)
 				if pid != os.Getpid() {
+					// Another instance is running. Exit 0 to avoid crash loops when
+					// run under launchd (KeepAlive/SuccessfulExit=false) or systemd
+					// (Restart=on-failure). This is not an error condition.
 					fmt.Printf("ActionD is already running (PID %d)\n", pid)
-					return
+					os.Exit(0)
 				}
 				// If pid == os.Getpid(), it means parent process registered us (daemon mode). Continue.
 			}
