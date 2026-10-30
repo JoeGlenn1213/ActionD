@@ -9,6 +9,12 @@
 #
 # On macOS: creates LaunchAgents in ~/Library/LaunchAgents (no sudo required)
 # On Linux: creates systemd --user units in ~/.config/systemd/user
+#
+# If brew services already registered the formula, install skips that service.
+# Homebrew's default name is sh.brew.<formula> (service.rb canonical_*).
+# It still resolves the legacy names homebrew.mxcl.<formula> (macOS launchd)
+# and homebrew.<formula> (Linux systemd). Pass --ignore-homebrew to install
+# our agent anyway.
 
 set -euo pipefail
 
@@ -16,7 +22,11 @@ set -euo pipefail
 # Configuration
 #------------------------------------------------------------------------------
 LAUNCHAGENT_DIR="${HOME}/Library/LaunchAgents"
+# Root brew services uses /Library/LaunchDaemons. Tests may point this elsewhere.
+LAUNCH_DAEMON_DIR="${AUTOSTART_LAUNCH_DAEMON_DIR:-/Library/LaunchDaemons}"
 SYSTEMD_USER_DIR="${HOME}/.config/systemd/user"
+# Root brew services uses /usr/lib/systemd/system. Tests may point this elsewhere.
+SYSTEMD_SYSTEM_DIR="${AUTOSTART_SYSTEMD_SYSTEM_DIR:-/usr/lib/systemd/system}"
 REQUIRED_PYTHON_MAJOR=3
 REQUIRED_PYTHON_MINOR=8
 
@@ -28,6 +38,7 @@ ACTIOND_SERVICE="actiond.service"
 # Options (set via command line)
 DRY_RUN=false
 FORCE=false
+IGNORE_HOMEBREW=false
 OPT_LGH_BIN=""
 OPT_ACTIOND_BIN=""
 OPT_PATH=""
@@ -44,8 +55,17 @@ warn()  { printf '\033[1;33m[WARN]\033[0m %s\n' "$*" >&2; }
 error() { printf '\033[1;31m[ERROR]\033[0m %s\n' "$*" >&2; exit 1; }
 success() { printf '\033[1;32m[OK]\033[0m %s\n' "$*"; }
 
-is_macos() { [[ "$(uname -s)" == "Darwin" ]]; }
-is_linux() { [[ "$(uname -s)" == "Linux" ]]; }
+# AUTOSTART_PLATFORM overrides uname for tests (Darwin or Linux). Leave it unset.
+autostart_uname() {
+    if [[ -n "${AUTOSTART_PLATFORM:-}" ]]; then
+        printf '%s\n' "$AUTOSTART_PLATFORM"
+    else
+        uname -s
+    fi
+}
+
+is_macos() { [[ "$(autostart_uname)" == "Darwin" ]]; }
+is_linux() { [[ "$(autostart_uname)" == "Linux" ]]; }
 
 resolve_bin() {
     local name="$1"
@@ -200,6 +220,172 @@ get_launchctl_pid() {
 is_systemd_active() {
     local service="$1"
     systemctl --user is-active "$service" &>/dev/null
+}
+
+# Homebrew brew services names, from Homebrew Library/Homebrew/service.rb:
+#   default/canonical plist + systemd name: sh.brew.<formula>
+#   legacy macOS launchd label:             homebrew.mxcl.<formula>
+#   legacy Linux systemd unit:              homebrew.<formula>
+# brew services copies that file into the user (or root) service directory
+# and loads it. Either the file or a loaded label means it is registered.
+# JoeGlenn1213/tap formulae do not set an explicit service name, so both apply.
+describe_homebrew_service() {
+    local formula="$1"
+    if is_macos; then
+        describe_homebrew_launchd "$formula"
+    elif is_linux; then
+        describe_homebrew_systemd "$formula"
+    else
+        return 1
+    fi
+}
+
+describe_homebrew_launchd() {
+    local formula="$1"
+    local -a labels=("sh.brew.${formula}" "homebrew.mxcl.${formula}")
+    local label user_plist boot_plist pid where
+
+    for label in "${labels[@]}"; do
+        if is_launchd_loaded "$label"; then
+            pid="$(get_launchctl_pid "$label")"
+            user_plist="${LAUNCHAGENT_DIR}/${label}.plist"
+            boot_plist="${LAUNCH_DAEMON_DIR}/${label}.plist"
+            where="loaded in launchd"
+            if [[ -f "$user_plist" ]]; then
+                where="plist ${user_plist}"
+            elif [[ -f "$boot_plist" ]]; then
+                where="plist ${boot_plist}"
+            fi
+            if [[ -n "$pid" ]]; then
+                printf 'launchd label %s (%s, running PID %s)\n' "$label" "$where" "$pid"
+            else
+                printf 'launchd label %s (%s, loaded but not running)\n' "$label" "$where"
+            fi
+            return 0
+        fi
+    done
+
+    for label in "${labels[@]}"; do
+        user_plist="${LAUNCHAGENT_DIR}/${label}.plist"
+        if [[ -f "$user_plist" ]]; then
+            printf 'launchd label %s (plist %s, not loaded)\n' "$label" "$user_plist"
+            return 0
+        fi
+    done
+
+    for label in "${labels[@]}"; do
+        boot_plist="${LAUNCH_DAEMON_DIR}/${label}.plist"
+        if [[ -f "$boot_plist" ]]; then
+            printf 'launchd label %s (plist %s, not loaded)\n' "$label" "$boot_plist"
+            return 0
+        fi
+    done
+    return 1
+}
+
+systemd_user_enabled() {
+    local unit="$1"
+    command -v systemctl >/dev/null 2>&1 || return 1
+    systemctl --user is-enabled "$unit" &>/dev/null
+}
+
+systemd_user_pid() {
+    local unit="$1"
+    local pid=""
+    command -v systemctl >/dev/null 2>&1 || return 0
+    pid="$(systemctl --user show "$unit" --property=MainPID --value 2>/dev/null || true)"
+    if [[ -z "$pid" || "$pid" == "0" ]]; then
+        return 0
+    fi
+    printf '%s' "$pid"
+}
+
+describe_homebrew_systemd() {
+    local formula="$1"
+    local -a names=("sh.brew.${formula}" "homebrew.${formula}")
+    local name unit user_unit boot_unit pid
+
+    for name in "${names[@]}"; do
+        unit="${name}.service"
+        if is_systemd_active "$unit"; then
+            pid="$(systemd_user_pid "$unit")"
+            user_unit="${SYSTEMD_USER_DIR}/${unit}"
+            if [[ -n "$pid" ]]; then
+                if [[ -f "$user_unit" ]]; then
+                    printf 'systemd user unit %s (unit %s, running PID %s)\n' "$name" "$user_unit" "$pid"
+                else
+                    printf 'systemd user unit %s (running PID %s)\n' "$name" "$pid"
+                fi
+            else
+                printf 'systemd user unit %s (active)\n' "$name"
+            fi
+            return 0
+        fi
+    done
+
+    for name in "${names[@]}"; do
+        unit="${name}.service"
+        if systemd_user_enabled "$unit"; then
+            user_unit="${SYSTEMD_USER_DIR}/${unit}"
+            if [[ -f "$user_unit" ]]; then
+                printf 'systemd user unit %s (unit %s, enabled, not running)\n' "$name" "$user_unit"
+            else
+                printf 'systemd user unit %s (enabled, not running)\n' "$name"
+            fi
+            return 0
+        fi
+    done
+
+    for name in "${names[@]}"; do
+        unit="${name}.service"
+        user_unit="${SYSTEMD_USER_DIR}/${unit}"
+        if [[ -f "$user_unit" ]]; then
+            printf 'systemd user unit %s (unit %s, not running)\n' "$name" "$user_unit"
+            return 0
+        fi
+    done
+
+    for name in "${names[@]}"; do
+        unit="${name}.service"
+        boot_unit="${SYSTEMD_SYSTEM_DIR}/${unit}"
+        if [[ -f "$boot_unit" ]]; then
+            printf 'systemd system unit %s (unit %s)\n' "$name" "$boot_unit"
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Return 0 when install must skip this formula because Homebrew registered it.
+# own_file, when set, is our agent path; mentioned if it is already there too.
+homebrew_blocks_install() {
+    local formula="$1"
+    local display="$2"
+    local own_file="${3:-}"
+    local desc=""
+    if ! desc="$(describe_homebrew_service "$formula")"; then
+        return 1
+    fi
+    if $IGNORE_HOMEBREW; then
+        warn "${display} is already managed by Homebrew (${desc})."
+        warn "--ignore-homebrew is set, so our agent will be installed too. Two managers can start two copies."
+        return 1
+    fi
+    warn "Skipping ${display}: Homebrew already manages it (${desc})."
+    warn 'Not creating a second agent. Use `brew services` to manage it, or pass --ignore-homebrew to install ours anyway.'
+    if [[ -n "$own_file" && -f "$own_file" ]]; then
+        warn "Our agent file is also present (${own_file}). Leaving both unchanged."
+    fi
+    return 0
+}
+
+note_homebrew_left() {
+    local formula="$1"
+    local display="$2"
+    local desc=""
+    if desc="$(describe_homebrew_service "$formula")"; then
+        info "Left Homebrew-managed ${display} in place (${desc})"
+    fi
 }
 
 #------------------------------------------------------------------------------
@@ -398,16 +584,28 @@ install_macos() {
         actiond_bin="$(resolve_bin actiond)"
     fi
 
+    # Homebrew-managed services are skipped unless --ignore-homebrew.
+    # A skipped service is not an "our file" conflict: --force would only
+    # add a second agent beside the one brew services already registered.
+    local skip_lgh=false
+    local skip_actiond=false
+    if homebrew_blocks_install "lgh" "LGH" "$lgh_plist"; then
+        skip_lgh=true
+    fi
+    if homebrew_blocks_install "actiond" "ActionD" "$actiond_plist"; then
+        skip_actiond=true
+    fi
+
     # Check for existing plists and collect all conflicts
     local conflicts=()
     local existing_lgh_bin existing_actiond_bin
     existing_lgh_bin="$(extract_plist_bin "$lgh_plist")"
     existing_actiond_bin="$(extract_plist_bin "$actiond_plist")"
 
-    if [[ -f "$lgh_plist" ]] && ! $FORCE; then
+    if [[ -f "$lgh_plist" ]] && ! $FORCE && ! $skip_lgh; then
         conflicts+=("LGH plist exists: $lgh_plist (binary: ${existing_lgh_bin:-unknown})")
     fi
-    if [[ -f "$actiond_plist" ]] && ! $FORCE; then
+    if [[ -f "$actiond_plist" ]] && ! $FORCE && ! $skip_actiond; then
         conflicts+=("ActionD plist exists: $actiond_plist (binary: ${existing_actiond_bin:-unknown})")
     fi
 
@@ -456,7 +654,9 @@ install_macos() {
     fi
 
     # LGH
-    if [[ -n "$lgh_bin" ]]; then
+    if $skip_lgh; then
+        :
+    elif [[ -n "$lgh_bin" ]]; then
         info "Using lgh binary: $lgh_bin"
         if [[ -f "$lgh_plist" ]]; then
             backup_file "$lgh_plist"
@@ -478,7 +678,9 @@ install_macos() {
     fi
 
     # ActionD
-    if [[ -n "$actiond_bin" ]]; then
+    if $skip_actiond; then
+        :
+    elif [[ -n "$actiond_bin" ]]; then
         info "Using actiond binary: $actiond_bin"
         if [[ -f "$actiond_plist" ]]; then
             backup_file "$actiond_plist"
@@ -530,16 +732,29 @@ uninstall_macos() {
     else
         info "LGH LaunchAgent not found"
     fi
+
+    note_homebrew_left "lgh" "LGH"
+    note_homebrew_left "actiond" "ActionD"
 }
 
 status_macos() {
     info "Checking LaunchAgent status..."
     local lgh_plist="${LAUNCHAGENT_DIR}/${LGH_PLIST_LABEL}.plist"
     local actiond_plist="${LAUNCHAGENT_DIR}/${ACTIOND_PLIST_LABEL}.plist"
+    local lgh_brew="" actiond_brew="" lgh_own=false actiond_own=false
+
+    lgh_brew="$(describe_homebrew_service lgh || true)"
+    actiond_brew="$(describe_homebrew_service actiond || true)"
 
     echo ""
     echo "LGH:"
+    if [[ -n "$lgh_brew" ]]; then
+        echo "  Homebrew: ${lgh_brew}"
+    else
+        echo "  Homebrew: not registered"
+    fi
     if is_launchd_loaded "$LGH_PLIST_LABEL"; then
+        lgh_own=true
         local lgh_bin pid
         lgh_bin="$(extract_plist_bin "$lgh_plist")"
         echo "  Plist:  ${lgh_plist}${lgh_plist:+ (file exists: }$( [[ -f "$lgh_plist" ]] && echo "yes" || echo "no" ))"
@@ -551,6 +766,7 @@ status_macos() {
             echo "  Status: loaded but not running"
         fi
     elif [[ -f "$lgh_plist" ]]; then
+        lgh_own=true
         local lgh_bin
         lgh_bin="$(extract_plist_bin "$lgh_plist")"
         echo "  Plist:  $lgh_plist"
@@ -559,10 +775,19 @@ status_macos() {
     else
         echo "  Status: not installed"
     fi
+    if [[ -n "$lgh_brew" && "$lgh_own" == true ]]; then
+        echo "  Conflict: Homebrew and ${LGH_PLIST_LABEL} are both registered"
+    fi
 
     echo ""
     echo "ActionD:"
+    if [[ -n "$actiond_brew" ]]; then
+        echo "  Homebrew: ${actiond_brew}"
+    else
+        echo "  Homebrew: not registered"
+    fi
     if is_launchd_loaded "$ACTIOND_PLIST_LABEL"; then
+        actiond_own=true
         local actiond_bin pid
         actiond_bin="$(extract_plist_bin "$actiond_plist")"
         echo "  Plist:  ${actiond_plist}${actiond_plist:+ (file exists: }$( [[ -f "$actiond_plist" ]] && echo "yes" || echo "no" ))"
@@ -574,6 +799,7 @@ status_macos() {
             echo "  Status: loaded but not running"
         fi
     elif [[ -f "$actiond_plist" ]]; then
+        actiond_own=true
         local actiond_bin
         actiond_bin="$(extract_plist_bin "$actiond_plist")"
         echo "  Plist:  $actiond_plist"
@@ -581,6 +807,9 @@ status_macos() {
         echo "  Status: plist exists but not loaded"
     else
         echo "  Status: not installed"
+    fi
+    if [[ -n "$actiond_brew" && "$actiond_own" == true ]]; then
+        echo "  Conflict: Homebrew and ${ACTIOND_PLIST_LABEL} are both registered"
     fi
     echo ""
 }
@@ -608,16 +837,25 @@ install_linux() {
         actiond_bin="$(resolve_bin actiond)"
     fi
 
+    local skip_lgh=false
+    local skip_actiond=false
+    if homebrew_blocks_install "lgh" "LGH" "$lgh_unit"; then
+        skip_lgh=true
+    fi
+    if homebrew_blocks_install "actiond" "ActionD" "$actiond_unit"; then
+        skip_actiond=true
+    fi
+
     # Check for existing units and collect all conflicts
     local conflicts=()
     local existing_lgh_bin existing_actiond_bin
     existing_lgh_bin="$(extract_unit_bin "$lgh_unit")"
     existing_actiond_bin="$(extract_unit_bin "$actiond_unit")"
 
-    if [[ -f "$lgh_unit" ]] && ! $FORCE; then
+    if [[ -f "$lgh_unit" ]] && ! $FORCE && ! $skip_lgh; then
         conflicts+=("LGH unit exists: $lgh_unit (binary: ${existing_lgh_bin:-unknown})")
     fi
-    if [[ -f "$actiond_unit" ]] && ! $FORCE; then
+    if [[ -f "$actiond_unit" ]] && ! $FORCE && ! $skip_actiond; then
         conflicts+=("ActionD unit exists: $actiond_unit (binary: ${existing_actiond_bin:-unknown})")
     fi
 
@@ -659,8 +897,12 @@ install_linux() {
         mkdir -p "$SYSTEMD_USER_DIR"
     fi
 
+    local did_install=false
+
     # LGH
-    if [[ -n "$lgh_bin" ]]; then
+    if $skip_lgh; then
+        :
+    elif [[ -n "$lgh_bin" ]]; then
         info "Using lgh binary: $lgh_bin"
         if [[ -f "$lgh_unit" ]]; then
             backup_file "$lgh_unit"
@@ -675,6 +917,7 @@ install_linux() {
             systemctl --user daemon-reload
             systemctl --user enable --now "$LGH_SERVICE"
             success "LGH systemd unit installed and enabled"
+            did_install=true
         fi
     else
         warn "lgh not found on PATH; skipping LGH systemd unit"
@@ -682,7 +925,9 @@ install_linux() {
     fi
 
     # ActionD
-    if [[ -n "$actiond_bin" ]]; then
+    if $skip_actiond; then
+        :
+    elif [[ -n "$actiond_bin" ]]; then
         info "Using actiond binary: $actiond_bin"
         if [[ -f "$actiond_unit" ]]; then
             backup_file "$actiond_unit"
@@ -697,6 +942,7 @@ install_linux() {
             systemctl --user daemon-reload
             systemctl --user enable --now "$ACTIOND_SERVICE"
             success "ActionD systemd unit installed and enabled"
+            did_install=true
         fi
     else
         warn "actiond not found on PATH; skipping ActionD systemd unit"
@@ -704,7 +950,7 @@ install_linux() {
     fi
 
     # Note about linger for start-at-boot without login
-    if [[ -n "$lgh_bin" || -n "$actiond_bin" ]] && ! $DRY_RUN; then
+    if $did_install; then
         echo ""
         warn "Note: For services to start at boot without logging in, run:"
         echo "      loginctl enable-linger \$USER"
@@ -746,16 +992,30 @@ uninstall_linux() {
     if ! $DRY_RUN; then
         systemctl --user daemon-reload 2>/dev/null || true
     fi
+
+    note_homebrew_left "lgh" "LGH"
+    note_homebrew_left "actiond" "ActionD"
 }
 
 status_linux() {
     info "Checking systemd --user unit status..."
     local lgh_unit="${SYSTEMD_USER_DIR}/${LGH_SERVICE}"
     local actiond_unit="${SYSTEMD_USER_DIR}/${ACTIOND_SERVICE}"
+    local lgh_brew="" actiond_brew=""
+    local lgh_own=false actiond_own=false
+
+    lgh_brew="$(describe_homebrew_service lgh || true)"
+    actiond_brew="$(describe_homebrew_service actiond || true)"
 
     echo ""
     echo "LGH:"
+    if [[ -n "$lgh_brew" ]]; then
+        echo "  Homebrew: ${lgh_brew}"
+    else
+        echo "  Homebrew: not registered"
+    fi
     if [[ -f "$lgh_unit" ]]; then
+        lgh_own=true
         local lgh_bin
         lgh_bin="$(extract_unit_bin "$lgh_unit")"
         echo "  Unit:   $lgh_unit"
@@ -770,10 +1030,19 @@ status_linux() {
     else
         echo "  Status: not installed"
     fi
+    if [[ -n "$lgh_brew" && "$lgh_own" == true ]]; then
+        echo "  Conflict: Homebrew and ${LGH_SERVICE} are both registered"
+    fi
 
     echo ""
     echo "ActionD:"
+    if [[ -n "$actiond_brew" ]]; then
+        echo "  Homebrew: ${actiond_brew}"
+    else
+        echo "  Homebrew: not registered"
+    fi
     if [[ -f "$actiond_unit" ]]; then
+        actiond_own=true
         local actiond_bin
         actiond_bin="$(extract_unit_bin "$actiond_unit")"
         echo "  Unit:   $actiond_unit"
@@ -787,6 +1056,9 @@ status_linux() {
         fi
     else
         echo "  Status: not installed"
+    fi
+    if [[ -n "$actiond_brew" && "$actiond_own" == true ]]; then
+        echo "  Conflict: Homebrew and ${ACTIOND_SERVICE} are both registered"
     fi
 
     # Linger status
@@ -815,6 +1087,7 @@ Commands:
 Install Options:
   --dry-run              Show what would be done without making changes
   --force                Overwrite existing service files (backs up first)
+  --ignore-homebrew      Also install our agent when brew services already registered it
   --lgh-bin PATH         Use specified lgh binary instead of PATH lookup
   --actiond-bin PATH     Use specified actiond binary instead of PATH lookup
   --path PATH            Set PATH for both services (colon-separated)
@@ -830,6 +1103,15 @@ Uninstall Options:
 
 On macOS: creates user LaunchAgents in ~/Library/LaunchAgents
 On Linux: creates systemd --user units in ~/.config/systemd/user
+
+Homebrew:
+  install skips a service that brew services already registered, so we do not
+  add a second agent. Names checked (Homebrew service.rb): sh.brew.<formula>
+  (current default) and legacy homebrew.mxcl.<formula> on macOS /
+  homebrew.<formula> on Linux. A match is a plist or unit in the user service
+  directory, the root service directory, or a label loaded in launchd / systemd.
+  status reports that. --ignore-homebrew installs our agent anyway.
+  uninstall does not remove Homebrew's unit.
 
 PATH handling:
   By default, a minimal PATH is computed: binary dir + brew prefix + system paths.
@@ -864,6 +1146,10 @@ main() {
                 ;;
             --force)
                 FORCE=true
+                shift
+                ;;
+            --ignore-homebrew)
+                IGNORE_HOMEBREW=true
                 shift
                 ;;
             --lgh-bin)

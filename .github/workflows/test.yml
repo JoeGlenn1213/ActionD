@@ -20,6 +20,11 @@ jobs:
           go-version: '1.25'
           cache: true
 
+      - name: Check autostart script
+        run: |
+          bash -n scripts/autostart.sh
+          bash scripts/autostart_test.sh
+
       - name: Download dependencies
         run: go mod download
 
