@@ -94,6 +94,98 @@ actiond doctor
 open http://localhost:3000
 ```
 
+## Start on boot
+
+ActionD and LGH can be configured to start automatically when you log in. This is optional and does not require root/sudo.
+
+### Prerequisites
+
+- **Python 3.8+** recommended for ActionD plugins (warning if missing, core works without it)
+- `lgh` and `actiond` installed via Homebrew (or on PATH):
+
+```bash
+brew install JoeGlenn1213/tap/lgh
+brew install JoeGlenn1213/tap/actiond
+```
+
+### Install autostart services
+
+```bash
+scripts/autostart.sh install
+```
+
+This creates:
+- **macOS**: LaunchAgents in `~/Library/LaunchAgents` (loaded via `launchctl bootstrap`)
+- **Linux**: systemd `--user` units in `~/.config/systemd/user` (enabled via `systemctl --user enable --now`)
+
+Services are started immediately after installation. **Existing service files are never overwritten** unless you pass `--force` (which creates a timestamped backup first).
+
+**Homebrew:** if `brew services` already registered LGH or ActionD, `install` skips that service and prints the label, instead of adding a second agent. `status` reports it. `--ignore-homebrew` installs our agent anyway (two managers can start two copies). `uninstall` does not stop or delete the Homebrew unit.
+
+Names checked, from current Homebrew `service.rb`: default `sh.brew.lgh` / `sh.brew.actiond`, plus legacy `homebrew.mxcl.lgh` / `homebrew.mxcl.actiond` (macOS launchd) and `homebrew.lgh` / `homebrew.actiond` (Linux systemd). A match is the plist or unit in the user service directory, the root service directory (`/Library/LaunchDaemons` or `/usr/lib/systemd/system`), or a label already loaded in launchd / `systemd --user`.
+
+### Install options
+
+```bash
+scripts/autostart.sh install [options]
+
+Options:
+  --dry-run              Preview changes without writing files
+  --force                Overwrite existing service files (backs up first)
+  --ignore-homebrew      Install our agent even if brew services already registered it
+  --lgh-bin PATH         Use specified lgh binary instead of PATH lookup
+  --actiond-bin PATH     Use specified actiond binary instead of PATH lookup
+  --path PATH            Set PATH for both services (colon-separated)
+  --lgh-log-dir DIR      LGH log directory (macOS; default: ~/Library/Logs)
+  --actiond-log-dir DIR  ActionD log directory (macOS; default: ~/Library/Logs)
+  --log-dir DIR          Log directory for both services (macOS shorthand)
+  --lgh-env KEY=VALUE    Add environment variable for LGH only (can be repeated)
+  --actiond-env KEY=VAL  Add environment variable for ActionD only (can be repeated)
+  --env KEY=VALUE        Add environment variable for both services (can be repeated)
+```
+
+Example with per-service environment:
+
+```bash
+scripts/autostart.sh install \
+  --actiond-env ACTIOND_MCP_ALLOW_LIFECYCLE=1 \
+  --actiond-log-dir ~/.localgithub/actions \
+  --lgh-log-dir ~/.localgithub/logs
+```
+
+**PATH handling**: By default, a minimal PATH is computed (binary dir + brew prefix + system paths). Use `--path` to set it explicitly. With `--force`, existing PATH from the current plist/unit is preserved unless `--path` is given; if the existing plist had no PATH, a minimal one is added.
+
+**Crash loop prevention**: Services use `KeepAlive/SuccessfulExit=false` (macOS) or `Restart=on-failure` (Linux), and `actiond start` exits 0 when another instance is already running. This prevents infinite restart loops if ActionD is started manually before the service manager launches it. **Trade-off**: if `actiond start` exits 0 because a manually-started instance was running, launchd will not relaunch ActionD if that manual instance later dies — run `launchctl kickstart gui/$UID/com.localgithub.actiond` to restart it, or stop the manual instance and let launchd manage it.
+
+### Check status
+
+```bash
+scripts/autostart.sh status
+```
+
+Shows whether LGH and ActionD are loaded (not just file exists), their configured binary paths, and whether they are actually running (with PID). Also reports a Homebrew-managed service when `sh.brew.*` or the legacy `homebrew.mxcl.*` / `homebrew.*` unit is registered, and warns if that and our agent are both present.
+
+### Uninstall
+
+```bash
+scripts/autostart.sh uninstall [--dry-run]
+```
+
+Stops and removes the service definitions this script installed. A unit registered by `brew services` is left in place.
+
+### Linux: start at boot without login
+
+By default, systemd user services only start when you log in. To have them start at boot (without logging in), run:
+
+```bash
+loginctl enable-linger $USER
+```
+
+### Logs
+
+- **macOS**: `<log-dir>/lgh.launchd.out`, `<log-dir>/lgh.launchd.err`, `<log-dir>/actiond.launchd.out`, `<log-dir>/actiond.launchd.err`
+- **Linux**: `journalctl --user -u lgh.service` / `journalctl --user -u actiond.service`
+
 ### Default directories and auto-detection
 
 - Plugin directories are probed in order:
