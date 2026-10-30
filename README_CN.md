@@ -118,6 +118,10 @@ scripts/autostart.sh install
 
 安装后服务会立即启动。**已存在的服务文件不会被覆盖**，除非传入 `--force`（会先创建带时间戳的备份）。
 
+**Homebrew：** 如果 `brew services` 已经注册了 LGH 或 ActionD，`install` 会跳过该服务并打印标签，而不会再装一个代理。`status` 会报告这一情况。`--ignore-homebrew` 仍会安装我们的代理（两个管理器可能各启动一份）。`uninstall` 不会停止或删除 Homebrew 的单元。
+
+识别的名称与当前 Homebrew `service.rb` 一致：默认 `sh.brew.lgh` / `sh.brew.actiond`，以及旧名 `homebrew.mxcl.lgh` / `homebrew.mxcl.actiond`（macOS launchd）和 `homebrew.lgh` / `homebrew.actiond`（Linux systemd）。命中条件是用户服务目录或 root 服务目录（`/Library/LaunchDaemons` 或 `/usr/lib/systemd/system`）里的 plist/单元，或者 launchd / `systemd --user` 中已经加载的标签。
+
 ### 安装选项
 
 ```bash
@@ -126,6 +130,7 @@ scripts/autostart.sh install [选项]
 选项：
   --dry-run              预览更改而不写入文件
   --force                覆盖已存在的服务文件（会先备份）
+  --ignore-homebrew      即使 brew services 已注册，也安装我们的代理
   --lgh-bin PATH         使用指定的 lgh 二进制文件而非 PATH 查找
   --actiond-bin PATH     使用指定的 actiond 二进制文件而非 PATH 查找
   --path PATH            设置两个服务的 PATH（冒号分隔）
@@ -156,7 +161,7 @@ scripts/autostart.sh install \
 scripts/autostart.sh status
 ```
 
-显示 LGH 和 ActionD 是否已加载（不仅是文件存在）、配置的二进制文件路径、以及是否正在运行（包含 PID）。
+显示 LGH 和 ActionD 是否已加载（不仅是文件存在）、配置的二进制文件路径、以及是否正在运行（包含 PID）。若已注册 Homebrew 管理的服务（`sh.brew.*` 或旧名 `homebrew.mxcl.*` / `homebrew.*`），也会一并报告；两者同时存在时会提示冲突。
 
 ### 卸载
 
@@ -164,7 +169,7 @@ scripts/autostart.sh status
 scripts/autostart.sh uninstall [--dry-run]
 ```
 
-停止并删除服务定义。
+停止并删除本脚本安装的服务定义。`brew services` 注册的单元会保留。
 
 ### Linux：无需登录即可开机启动
 

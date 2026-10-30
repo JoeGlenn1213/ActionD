@@ -120,6 +120,10 @@ This creates:
 
 Services are started immediately after installation. **Existing service files are never overwritten** unless you pass `--force` (which creates a timestamped backup first).
 
+**Homebrew:** if `brew services` already registered LGH or ActionD, `install` skips that service and prints the label, instead of adding a second agent. `status` reports it. `--ignore-homebrew` installs our agent anyway (two managers can start two copies). `uninstall` does not stop or delete the Homebrew unit.
+
+Names checked, from current Homebrew `service.rb`: default `sh.brew.lgh` / `sh.brew.actiond`, plus legacy `homebrew.mxcl.lgh` / `homebrew.mxcl.actiond` (macOS launchd) and `homebrew.lgh` / `homebrew.actiond` (Linux systemd). A match is the plist or unit in the user service directory, the root service directory (`/Library/LaunchDaemons` or `/usr/lib/systemd/system`), or a label already loaded in launchd / `systemd --user`.
+
 ### Install options
 
 ```bash
@@ -128,6 +132,7 @@ scripts/autostart.sh install [options]
 Options:
   --dry-run              Preview changes without writing files
   --force                Overwrite existing service files (backs up first)
+  --ignore-homebrew      Install our agent even if brew services already registered it
   --lgh-bin PATH         Use specified lgh binary instead of PATH lookup
   --actiond-bin PATH     Use specified actiond binary instead of PATH lookup
   --path PATH            Set PATH for both services (colon-separated)
@@ -158,7 +163,7 @@ scripts/autostart.sh install \
 scripts/autostart.sh status
 ```
 
-Shows whether LGH and ActionD are loaded (not just file exists), their configured binary paths, and whether they are actually running (with PID).
+Shows whether LGH and ActionD are loaded (not just file exists), their configured binary paths, and whether they are actually running (with PID). Also reports a Homebrew-managed service when `sh.brew.*` or the legacy `homebrew.mxcl.*` / `homebrew.*` unit is registered, and warns if that and our agent are both present.
 
 ### Uninstall
 
@@ -166,7 +171,7 @@ Shows whether LGH and ActionD are loaded (not just file exists), their configure
 scripts/autostart.sh uninstall [--dry-run]
 ```
 
-Stops and removes the service definitions.
+Stops and removes the service definitions this script installed. A unit registered by `brew services` is left in place.
 
 ### Linux: start at boot without login
 
