@@ -1,5 +1,29 @@
 # Changelog
 
+# Release v1.3.1
+
+**Released**: 2026-10-30
+
+**Changes since**: v1.3.0
+
+> 主题：开机自启（免 sudo）随发布产物分发 + P0 文档治理。来源：PR #1（autostart 脚本）与 PR #2（P0 source polish）。
+
+## 开机自启脚本 `scripts/autostart.sh`
+
+- macOS 用户级 LaunchAgents（`launchctl bootstrap gui/$UID`）与 Linux `systemd --user` 单元，全程免 sudo；`install` / `uninstall` / `status` 子命令，`--dry-run` 预览生成的 plist/unit
+- **Homebrew 共存**：`brew services` 已注册 LGH / ActionD（`sh.brew.*` 与 legacy `homebrew.mxcl.*` 命名均识别）时 `install` 跳过该服务并说明原因，`--ignore-homebrew` 可强制；既有 plist/unit 不覆盖（`--force` 先写时间戳 `.bak`）
+- **crash-loop 修复**：plist `KeepAlive = { SuccessfulExit = false }`（systemd 对应 `Restart=on-failure`）——正常退出不再被拉起，launchd 不再无限重启 `actiond start`；`actiond start` 检测到已有实例运行时显式 `os.Exit(0)` 并写入帮助文档
+- Web 控制台资源探测补 Homebrew share 路径（`/opt/homebrew`、`/usr/local`、Linuxbrew），`~/.localgithub/actiond-web/out` 缺失时回落
+- 回归：新增 `scripts/autostart_test.sh`（fixture plist/unit 与替身 `launchctl` / `systemctl`，含 legacy 与 `sh.brew.*` 命名）；`go test -race ./...` 全绿。真实 `launchctl bootstrap` / `systemctl --user` / `brew services` 会话未在 CI 执行，以真机 dry-run 验收
+
+## P0 文档治理
+
+- `docs/PLUGIN_GUIDE.md` / `docs/PLUGIN_SPEC.md` 按当前插件模型纠偏重写
+- 新增 `SECURITY.md`（默认回环绑定模型、`ACTIOND_TOKEN` 配置指引、漏洞报告渠道）；README / README_CN 补 `ACTIOND_*` 环境变量表
+- 社区入口：Issue 模板（bug / feature / question + config.yml）、PR 模板、双语 `CONTRIBUTING.md`
+
+---
+
 # Release v1.3.0
 
 **Released**: 2026-09-14
