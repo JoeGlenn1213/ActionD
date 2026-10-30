@@ -1,210 +1,154 @@
-# ActionD Plugin 开发指南
+# ActionD Plugin Guide
 
-> 让你的工具融入本地 AI 工作流
+[English](#overview) · [简体中文](#概述)
+
+How to add plugins to ActionD. The runtime contract is **`manifest.json` + dynamic discovery** — you do **not** edit `cmd/actiond/main.go` to register a plugin.
+
+Canonical code: `internal/plugin/manifest.go`, `internal/plugin/discovery.go`, `internal/app/runtime_paths.go`.  
+Schema for structured stdout: [`schemas/action-result.schema.json`](../schemas/action-result.schema.json).  
+Also see the README section [Dynamic Plugin Discovery](../README.md#dynamic-plugin-discovery-v107).
+
+---
+
+## Overview
+
+| Kind | How it runs | When to use |
+|------|-------------|-------------|
+| **Exec plugin (recommended)** | Any language via `command` + `args` in `manifest.json` | Lint, test, build, AI tools — almost everything in `plugins/` |
+| **Built-in Go plugin** | Compiled into the binary (`internal/` / `plugins/echo`) | Core/test helpers only; **not** the path for third-party or fork plugins |
+
+New checks: drop a directory under a scanned plugin root with `manifest.json` (+ script). Reload with `actiond_plugins_reload` / the web console, or restart ActionD. **No Go rebuild.**
+
+---
+
+## Plugin directories
+
+ActionD scans existing directories in this order (`DetectPluginDirs`):
+
+1. `<binary-dir>/plugins` — next to the `actiond` executable  
+2. `<cwd>/plugins` — current working directory (source checkout)  
+3. `~/.localgithub/actiond/plugins`  
+4. `~/.localgithub/plugins` — user / `actiond setup` materialization target  
+
+First discovery wins for a given plugin `name`; later duplicates are skipped.
+
+`actiond setup` installs the embedded builtin bundle into `~/.localgithub/plugins`.
+
+---
+
+## Quick start (exec + manifest)
+
+### 1. Create the plugin directory
+
+```
+plugins/my-plugin/
+├── manifest.json
+└── run.py
+```
+
+### 2. `manifest.json`
+
+Required for discovery/validation: `name`, `command`, `triggers` (non-empty).
+
+```json
+{
+  "apiVersion": "actiond.dev/v1",
+  "name": "my-plugin",
+  "version": "1.0.0",
+  "description": "Example plugin",
+  "command": "python3",
+  "args": ["run.py"],
+  "triggers": ["git.push"],
+  "languages": ["*"],
+  "timeout": "5m",
+  "artifacts": ["output.md"]
+}
+```
+
+See [PLUGIN_SPEC.md](PLUGIN_SPEC.md) for the full field reference.
+
+### 3. `run.py` (stdin JSON → stdout JSON)
+
+```python
+#!/usr/bin/env python3
+import json
+import os
+import sys
+
+def main():
+    inp = json.load(sys.stdin)
+    event = inp.get("event", {})
+    repo_path = inp.get("repo_path", "")
+    artifact_dir = inp.get("artifact_dir", "")
+
+    print(f"[my-plugin] {event.get('type')} @ {repo_path}", file=sys.stderr)
+
+    os.makedirs(artifact_dir, exist_ok=True)
+    out_path = os.path.join(artifact_dir, "output.md")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(f"# My Plugin\n\nRepo: {repo_path}\n")
+
+    # Minimal legacy shape (still supported):
+    print(json.dumps({"status": "success", "artifacts": ["output.md"]}))
+    # Prefer ActionResult when you need Policy Gate / AI hints — see PLUGIN_SPEC.md
+
+if __name__ == "__main__":
+    main()
+```
+
+### 4. Verify
+
+```bash
+# From a source tree with ./plugins/my-plugin/
+actiond plugins   # or start ActionD and check the web console / MCP plugin list
+```
+
+Hot-reload after edits: MCP `actiond_plugins_reload`, or restart the daemon. You do **not** need `ACTIOND_MCP_ALLOW_LIFECYCLE` for reload-only.
+
+---
+
+## Config override (no manifest)
+
+You can also declare an exec plugin in `~/.localgithub/actions/config.json` (see README Configuration). Prefer `manifest.json` for shareable plugins.
+
+---
+
+## Built-in Go plugins (maintainers only)
+
+The in-tree `plugins/echo` package implements `plugin.Plugin` and is wired in `loadPlugins` as a built-in. Interfaces live under `internal/plugin` — **external modules cannot import them**. Do not document `import .../internal/plugin` as a public extension API. For new work, use exec + `manifest.json`.
+
+---
+
+## Example plugins in this repo
+
+| Plugin | Path | Notes |
+|--------|------|--------|
+| python-ruff | `plugins/python-ruff/` | Typical Python exec + manifest |
+| go-lint | `plugins/go-lint/` | Go lint via Python runner |
+| env-check | `plugins/env-check/` | Language-agnostic (`languages: ["*"]`) |
+| echo | `plugins/echo/` | Built-in Go smoke plugin (no `manifest.json`) |
+
+---
+
+## Best practices
+
+1. **Idempotent** — same event → same outcome  
+2. **Timeouts** — set `timeout` in the manifest  
+3. **Logs on stderr** — stdout must be JSON only  
+4. **Artifacts** — write under `artifact_dir`; list names in the result  
+5. **ActionResult** — use structured status/decision/signals when gating matters  
 
 ---
 
 ## 概述
 
-ActionD 支持两种插件类型：
+ActionD 通过 **`manifest.json` 动态发现**加载插件，**不要**去改 `cmd/actiond/main.go` 注册。推荐用任意语言的 Exec 插件；内置 Go 插件仅供核心维护，且 `internal/plugin` 不可被仓外合法 import。
 
-| 类型 | 语言 | 适用场景 |
-|------|------|---------|
-| **Go 插件** | Go | 高性能、内嵌逻辑 |
-| **Exec 插件** | 任意 (Python/Node/Shell) | AI 集成、外部服务 |
+### 快速步骤
 
----
+1. 在扫描目录下新建 `plugins/my-plugin/{manifest.json,run.py}`  
+2. `manifest` 至少填 `name` / `command` / `triggers`  
+3. 脚本从 stdin 读 JSON，向 stdout 打 JSON；日志走 stderr  
+4. `actiond setup` 会把内置插件落到 `~/.localgithub/plugins`  
 
-## 快速开始
-
-### 方式 A: Exec 插件 (推荐)
-
-用任何语言编写脚本，ActionD 通过 stdin/stdout 通信。
-
-#### 1. 创建脚本
-
-```python
-#!/usr/bin/env python3
-# plugins/my-plugin/my_plugin.py
-
-import json
-import sys
-import os
-
-def main():
-    # 1. 读取输入
-    input_data = json.load(sys.stdin)
-    event = input_data.get('event', {})
-    repo_path = input_data.get('repo_path', '')
-    artifact_dir = input_data.get('artifact_dir', '')
-    
-    # 2. 你的逻辑
-    print(f"[my-plugin] Processing {event.get('type')}", file=sys.stderr)
-    
-    # 3. 写入 artifacts
-    os.makedirs(artifact_dir, exist_ok=True)
-    with open(f"{artifact_dir}/output.md", 'w') as f:
-        f.write(f"# My Plugin Output\n\nRepo: {repo_path}\n")
-    
-    # 4. 返回结果
-    print(json.dumps({
-        "status": "success",
-        "artifacts": ["output.md"],
-        "model": "gpt-4",  # 可选
-        "tokens": 1000     # 可选
-    }))
-
-if __name__ == '__main__':
-    main()
-```
-
-#### 2. 注册插件
-
-在 `cmd/actiond/main.go` 中添加：
-
-```go
-plugin.NewExecPlugin(plugin.ExecPluginConfig{
-    Name:       "my-plugin",
-    Command:    "python3",
-    Args:       []string{"/path/to/my_plugin.py"},
-    Triggers:   []string{"git.push"},  // 事件类型
-    Timeout:    5 * time.Minute,
-    WorkingDir: "/path/to/plugin/dir",
-})
-```
-
----
-
-### 方式 B: Go 插件
-
-实现 `plugin.Plugin` 接口：
-
-```go
-// plugins/my-plugin/my_plugin.go
-package myplugin
-
-import (
-    "github.com/JoeGlenn1213/actiond/internal/event"
-    "github.com/JoeGlenn1213/actiond/internal/plugin"
-)
-
-type MyPlugin struct{}
-
-func (p *MyPlugin) Name() string {
-    return "my-plugin"
-}
-
-func (p *MyPlugin) Triggers() []string {
-    return []string{event.TypeGitPush}
-}
-
-func (p *MyPlugin) Match(e event.Event) bool {
-    // 过滤条件，如: 只处理 main 分支
-    return true
-}
-
-func (p *MyPlugin) Run(ctx plugin.Context) error {
-    // 1. 读取事件
-    evt := ctx.Event
-    
-    // 2. 你的逻辑
-    
-    // 3. 写入 artifacts
-    if ctx.Artifacts != nil {
-        ctx.Artifacts.WriteJSON("result.json", map[string]string{
-            "repo": evt.Repo,
-        })
-    }
-    
-    return nil
-}
-```
-
----
-
-## 输入/输出协议
-
-### Exec 插件 stdin 输入
-
-```json
-{
-  "event": {
-    "id": "uuid",
-    "type": "git.push",
-    "repo": "ActionD",
-    "timestamp": "2025-12-27T21:48:00Z",
-    "_replayed": false
-  },
-  "repo_path": "/path/to/repo",
-  "artifact_dir": "~/.localgithub/actions/xxx/",
-  "diff": "...",
-  "files": ["file1.go", "file2.py"]
-}
-```
-
-### Exec 插件 stdout 输出
-
-```json
-{
-  "status": "success",       // 或 "error"
-  "error": "...",            // 仅 error 时
-  "artifacts": ["doc.md"],   // 创建的文件列表
-  "model": "glm-4.6",        // AI 模型 (可选)
-  "tokens": 12345,           // Token 消耗 (可选)
-  "duration_ms": 5000        // 执行时间 (可选)
-}
-```
-
----
-
-## 事件类型
-
-| 事件 | 触发时机 |
-|------|---------|
-| `repo.added` | 仓库添加到 LGH |
-| `repo.removed` | 仓库从 LGH 移除 |
-| `git.push` | 代码推送 |
-
----
-
-## ArtifactWriter API
-
-Go 插件可使用 `ctx.Artifacts`:
-
-```go
-// 写入原始字节
-ctx.Artifacts.Write("file.txt", []byte("content"))
-
-// 写入 JSON
-ctx.Artifacts.WriteJSON("data.json", myStruct)
-
-// 获取输出目录
-dir := ctx.Artifacts.Dir()
-```
-
----
-
-## 最佳实践
-
-1. **幂等性**: 同一事件多次执行应产生相同结果
-2. **超时处理**: Exec 插件设置合理 Timeout
-3. **错误日志**: 用 `stderr` 输出日志, `stdout` 仅返回 JSON
-4. **增量处理**: 利用 `event.Old` / `event.New` 只处理变更
-5. **Artifact 命名**: 使用有意义的文件名 (如 `architecture.md`)
-
----
-
-## 示例插件
-
-| 插件 | 路径 | 说明 |
-|------|------|------|
-| Echo | `plugins/echo/` | 最简单示例 (Go) |
-| DeepWiki | `deepwiki-mcp/scripts/actiond_adapter.py` | AI 代码分析 (Python) |
-
----
-
-## 下一步
-
-- [ ] 更多插件: Code Review, Security Scan, Architecture Diagram
-- [ ] ActionD Web UI: 可视化 Action 历史和 Artifacts
-- [ ] sqlite 持久化: ActionJob 状态管理
+完整字段与 `ActionResult` 契约见 [PLUGIN_SPEC.md](PLUGIN_SPEC.md)；英文 README 的 [Dynamic Plugin Discovery](../README.md#dynamic-plugin-discovery-v107) 与本文一致。

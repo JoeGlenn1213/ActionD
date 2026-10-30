@@ -189,15 +189,16 @@ Flags:
 
 ## 动态插件发现 (V1.0.7+)
 
-ActionD 支持**零代码**添加新插件。只需在插件目录创建 `manifest.json` 文件：
+ActionD 支持**零代码**添加新插件。只需在插件目录创建 `manifest.json` 文件。详细步骤：[docs/PLUGIN_GUIDE.md](docs/PLUGIN_GUIDE.md) · 契约：[docs/PLUGIN_SPEC.md](docs/PLUGIN_SPEC.md) · Schema：[`schemas/action-result.schema.json`](schemas/action-result.schema.json)。
 
 ### 插件目录
 
-ActionD 按以下顺序扫描插件：
+ActionD 按以下顺序扫描**已存在**的目录（`DetectPluginDirs`）：
 
-1. **系统插件**: `./plugins/` (与二进制文件同目录)
-2. **开发插件**: `./plugins/` (当前工作目录)
-3. **用户插件**: `~/.localgithub/plugins/`
+1. **系统插件**: `<binary-dir>/plugins`（与可执行文件同目录）
+2. **开发插件**: `<cwd>/plugins`（当前工作目录）
+3. **旧用户路径**: `~/.localgithub/actiond/plugins`（若存在）
+4. **用户插件**: `~/.localgithub/plugins`（`actiond setup` 会把内置插件落到此处）
 
 ### manifest.json 格式
 
@@ -227,6 +228,9 @@ ActionD 按以下顺序扫描插件：
 | `languages` | - | 支持的语言: `go`, `java`, `python`, `web`, `node`, `typescript`, `javascript`, `nextjs`, `*` |
 | `timeout` | - | 超时时间: `5m`, `30s` |
 | `refFilter` | - | Ref 匹配: `refs/tags/*` |
+| `repoFilter` | - | 仓库名 glob |
+| `supported_profiles` | - | `fast` / `full` / `release`（空 = 全部） |
+| `workingDir` | - | 相对 manifest 目录的工作目录 |
 
 ### 创建自定义插件
 
@@ -517,7 +521,21 @@ AI: [调用 actiond_actions_list]
 
 ## 配置
 
-运行时配置文件: `~/.localgithub/actions/config.json`
+运行时配置文件: `~/.localgithub/actions/config.json`（可用 `ACTIOND_CONFIG_PATH` 覆盖路径）。
+
+### 环境变量
+
+| 变量 | 默认值 | 作用 |
+|------|--------|------|
+| `ACTIOND_BIND` | `127.0.0.1:3000` | HTTP 监听地址。默认仅本机回环（未设 token 时 API 无认证）。仅在有意暴露局域网且**已设置** `ACTIOND_TOKEN` 时使用如 `0.0.0.0:3000`。 |
+| `ACTIOND_TOKEN` | _(未设置)_ | 可选的 `/api/*` 共享密钥。通过 `Authorization: Bearer <token>`、`X-ActionD-Token: <token>` 或 `?token=`（SSE `EventSource` 无法设请求头）传递。静态控制台资源仍可匿名访问。MCP 客户端会转发同一环境变量。 |
+| `ACTIOND_CORS_ORIGIN` | _(无)_ | 额外允许的浏览器 `Origin`（逗号分隔），在默认的 `localhost`/`127.0.0.1` 的 `:3000`/`:3001` 之外。 |
+| `ACTIOND_MCP_ALLOW_LIFECYCLE` | _(未设置)_ | 设为 `1` / `true` / `yes` 才允许 MCP 启停/重启守护进程。仅热加载插件不需要此变量。 |
+| `ACTIOND_LGH_URL` | `http://localhost:9418` | LGH 不在默认地址时的 HTTP 根 URL。 |
+| `ACTIOND_CONFIG_PATH` | `~/.localgithub/actions/config.json` | 用户插件配置文件路径。 |
+| `ACTIOND_ACTIONS_DIR` | `~/.localgithub/actions` | 数据目录（任务库、日志、产物）；主要用于测试或自定义布局。 |
+
+威胁模型与漏洞披露：[SECURITY.md](SECURITY.md)。
 
 ### 禁用插件
 
@@ -656,6 +674,14 @@ go install ./cmd/actiond
 ## 许可证
 
 MIT License - 详见 [LICENSE](LICENSE)
+
+## 安全
+
+威胁模型、加固建议与私下披露渠道见 [SECURITY.md](SECURITY.md)。
+
+## 贡献
+
+见 [CONTRIBUTING.md](CONTRIBUTING.md)。编写插件：[docs/PLUGIN_GUIDE.md](docs/PLUGIN_GUIDE.md)。
 
 ## 相关项目
 
